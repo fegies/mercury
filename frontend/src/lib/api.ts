@@ -18,7 +18,8 @@ async function makeRequest<T>(url: string, requestInit?: {
     const res = await fetch(url, requestInit as any);
     if (!res.ok)
         throw new Error("Request failed!");
-    return res.json();
+    if (res.status != 204)
+        return res.json();
 }
 
 class AdminApiClass {
@@ -41,11 +42,17 @@ class AdminApiClass {
         });
     }
     deleteProvider(id: string): Promise<void> {
-        return makeRequest("/api/admin/oauth", {
+        return makeRequest(`/api/admin/oauth/${id}`, {
             method: "DELETE",
-            body: id
         });
     }
 }
 
+class OauthApiClass {
+    listProviders(): Promise<{ provider_name: string, flow_url: string }[]> {
+        return makeRequest("/api/oauth/providers");
+    }
+}
+
 export const AdminApi = new AdminApiClass();
+export const OAuthApi = new OauthApiClass();

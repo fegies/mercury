@@ -43,6 +43,8 @@
                     rustfmt
                     gcc
                     cargo-watch
+                    mold
+                    openssl
                   ];
 
                   languages.rust = {
@@ -69,7 +71,7 @@
                   };
 
                   processes = {
-                    backend.exec = "cd backend && exec cargo watch -x run";
+                    backend.exec = "cd backend && export RUST_BACKTRACE=1 && exec cargo watch -x run";
                     frontend.exec = "cd frontend && exec npm run dev";
                   };
                 }

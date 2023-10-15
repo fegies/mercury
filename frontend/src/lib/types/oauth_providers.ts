@@ -1,6 +1,5 @@
 
 export class OAuthProvider {
-    id: string = "";
     name: string = "";
     auth_url: string = "";
     token_url: string = "";

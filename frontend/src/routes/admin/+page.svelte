@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { AdminApi } from '$lib/api';
-	import OauthConfig from '$lib/components/admin/oauth_config.svelte';
+	import OauthConfigList from '$lib/components/admin/oauth_config_list.svelte';
 	import type { AppConfig } from '$lib/types/oauth_providers';
 
 	let config: AppConfig;
@@ -40,6 +40,6 @@
 	</div>
 
 	<div class="p-10">
-		<OauthConfig />
+		<OauthConfigList app_config={config} />
 	</div>
 </div>

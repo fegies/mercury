@@ -1,14 +1,20 @@
-mod api;
+// mod api;
+mod admin_api;
+pub mod models;
+mod oauth;
+pub mod response_types;
 mod schema;
 use std::env;
 
-use diesel::{
-    r2d2::{ConnectionManager, Pool},
-    Connection, PgConnection,
-};
+use diesel::PgConnection;
 use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
 use dotenvy::dotenv;
+use rocket::{fairing::AdHoc, get, launch};
+use rocket_sync_db_pools::database;
 use tracing_subscriber::fmt::format::FmtSpan;
+
+#[macro_use]
+extern crate rocket;
 
 pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!("migrations");
 
@@ -27,9 +33,8 @@ fn init_tracing() {
         .init();
 }
 
-fn migrate_db(db_url: &str) {
+fn migrate_db(pg: &mut PgConnection) {
     tracing::info_span!("migrating database").in_scope(|| {
-        let mut pg = PgConnection::establish(&db_url).expect("could not connect to db");
         pg.run_pending_migrations(MIGRATIONS)
             .expect("could not run migrations");
     })
@@ -39,34 +44,45 @@ fn get_env_var(name: &str) -> String {
     env::var(name).expect(&format!("{name} must be set"))
 }
 
-pub type DbPool = Pool<ConnectionManager<PgConnection>>;
-pub struct InitializationState {
-    pub admin_key: String,
-    pub db_pool: DbPool,
+#[database("diesel")]
+struct Db(diesel::PgConnection);
+
+#[get("/")]
+fn index() -> &'static str {
+    "test"
 }
 
-impl InitializationState {
-    fn gather() -> Self {
-        let database_url = get_env_var("DATABASE_URL");
-        let db_pool = Pool::builder()
-            .min_idle(Some(1))
-            .build(ConnectionManager::new(database_url))
-            .expect("could not initialize connection pool");
+struct AdminPassword(String);
 
-        Self {
-            admin_key: get_env_var("ADMIN_PASSWORD"),
-            db_pool,
-        }
-    }
-}
-
-#[tokio::main]
-async fn main() {
+#[launch]
+fn rocket() -> _ {
     dotenv().ok();
     init_tracing();
 
     let database_url = get_env_var("DATABASE_URL");
-    migrate_db(&database_url);
+    let signing_key = "mUQLRO6z67uJ4yKHANismXvErSK0sjDLNsxgq+yrick=";
 
-    api::run(InitializationState::gather()).await
+    let admin_password = get_env_var("ADMIN_PASSWORD");
+
+    // todo!();
+    // migrate_db(&database_url);
+    let config = rocket::Config::figment()
+        .merge(("databases.diesel.url", database_url))
+        .merge(("databases.diesel.pool_size", 4))
+        .merge(("secret_key", signing_key));
+
+    rocket::custom(config)
+        .manage(AdminPassword(admin_password))
+        .attach(Db::fairing())
+        .attach(AdHoc::on_ignite("Diesel migrations", |rocket| async move {
+            let db = Db::get_one(&rocket)
+                .await
+                .expect("could not get db connection");
+
+            db.run(|db| migrate_db(db)).await;
+            rocket
+        }))
+        .mount("/", routes![index])
+        .mount("/api/admin", admin_api::routes())
+        .mount("/", crate::oauth::routes())
 }

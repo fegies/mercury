@@ -9,7 +9,7 @@ edition = "2021"
 tokio = {version = "1", features = ["rt-multi-thread", "macros", "net"]}
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"]}
-diesel = { version = "2.1.0", features = ["postgres", "r2d2"] }
+diesel = { version = "2.1.0", features = ["postgres", "r2d2","uuid"] }
 diesel_migrations = {version = "2.1.0"}
 dotenvy = "0.15"
 cookie = {version = "0.17", features = ["secure"]}
@@ -20,3 +20,5 @@ rocket_sync_db_pools = { version = "0.1.0-rc.3", features = ["diesel", "diesel_p
 rand = "0.8.5"
 url = "2.4.1"
 reqwest = { version = "0.11.22", features = ["json"] }
+base64 = "0.21.4"
+uuid = { version = "1.4.1", features = ["serde"] }

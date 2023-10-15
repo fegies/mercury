@@ -14,7 +14,9 @@
 			{#each providers as provider}
 				<li>
 					<span class="flex-auto">
-						<a class="button" href={provider.flow_url}>{provider.provider_name}</a>
+						<a class="btn variant-ghost-surface" href={provider.flow_url}
+							>{provider.provider_name}</a
+						>
 					</span>
 				</li>
 			{/each}

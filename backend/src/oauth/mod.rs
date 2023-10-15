@@ -1,3 +1,7 @@
+pub mod users;
+
+use base64::Engine;
+use cookie::time::{Duration, OffsetDateTime};
 use cookie::{Cookie, SameSite};
 use diesel::prelude::*;
 use rand::distributions::{Alphanumeric, DistString};
@@ -5,12 +9,13 @@ use rand::thread_rng;
 use rocket::http::CookieJar;
 use rocket::response::{Redirect, Responder};
 use rocket::serde::json::Json;
-use rocket::{Response, Route};
+use rocket::Route;
 use serde::{Deserialize, Serialize};
 use tracing::Level;
 use url::Url;
 
 use crate::models::OAuthProvider;
+use crate::oauth::users::UserManager;
 use crate::response_types::{DbResult, QueryFailure};
 use crate::{response_types::JsonResult, Db};
 
@@ -101,7 +106,7 @@ async fn start_flow(provider: String, db: Db, cookies: &CookieJar<'_>) -> DbResu
     .await
 }
 
-#[derive(Responder)]
+#[derive(Responder, Debug)]
 enum OAuthFailure {
     #[response(status = 400)]
     StateError(&'static str),
@@ -111,6 +116,8 @@ enum OAuthFailure {
     InvalidProvider(&'static str),
     #[response(status = 403)]
     TokenRedeemError(String),
+    #[response(status = 403)]
+    InvalidToken(String),
 }
 impl From<diesel::result::Error> for OAuthFailure {
     fn from(value: diesel::result::Error) -> Self {
@@ -125,7 +132,7 @@ impl From<reqwest::Error> for OAuthFailure {
 
 #[get("/oauth/flows/<provider>/callback?error=interaction_required")]
 fn handle_interaction_required(provider: String, cookies: &CookieJar<'_>) -> Redirect {
-    cookies.remove_private(Cookie::named("SAVED_PROVIDER"));
+    cookies.remove(Cookie::named("SAVED_PROVIDER"));
     Redirect::temporary(format!("/oauth/flows/{provider}"))
 }
 
@@ -138,6 +145,29 @@ async fn flow_error(provider: String, error: String, error_description: Option<S
     error_description
 }
 
+#[derive(Deserialize, Debug)]
+pub struct UserDescriptor {
+    iss: String,
+    sub: String,
+    name: String,
+    exp: u64,
+    preferred_username: String,
+}
+
+fn parse_id_token(token: &str) -> Result<UserDescriptor, OAuthFailure> {
+    fn inner(token: &str) -> Option<UserDescriptor> {
+        let mut parts = token.split('.');
+        // discard header
+        parts.next();
+        let body = parts.next()?;
+        let body = base64::engine::general_purpose::URL_SAFE_NO_PAD
+            .decode(body)
+            .ok()?;
+        serde_json::from_slice(&body).ok()
+    }
+    inner(token).ok_or_else(|| OAuthFailure::InvalidToken("Could not parse id token".to_owned()))
+}
+
 #[get("/oauth/flows/<provider>/callback?<code>&<state>")]
 async fn finish_flow(
     provider: String,
@@ -145,7 +175,7 @@ async fn finish_flow(
     cookies: &CookieJar<'_>,
     code: String,
     state: String,
-) -> Result<String, OAuthFailure> {
+) -> Result<Redirect, OAuthFailure> {
     let saved_state = cookies
         .get_private("OAUTH_STATE")
         .ok_or(OAuthFailure::StateError("no state available"))?;
@@ -153,6 +183,7 @@ async fn finish_flow(
     if &state != saved_state.value() {
         return Err(OAuthFailure::StateError("state does not match"));
     }
+    cookies.remove(Cookie::named("OAUTH_STATE"));
 
     #[derive(Serialize)]
     struct TokenParams {
@@ -190,6 +221,7 @@ async fn finish_flow(
         .await?;
 
     #[derive(Deserialize, Debug)]
+    #[allow(dead_code)]
     struct TokenResponse {
         access_token: String,
         token_type: String,
@@ -202,16 +234,23 @@ async fn finish_flow(
     let request_span = tracing::span!(Level::INFO, "requesting token");
     let _req = request_span.enter();
     let client = reqwest::Client::new();
-    println!("url: {token_uri}");
     let resp = client.post(token_uri).form(&token_params).send().await?;
     if resp.status() != 200 {
         return Err(OAuthFailure::TokenRedeemError(resp.text().await?));
     }
-
     let tokens: TokenResponse = resp.json().await?;
-    println!("{tokens:?}");
 
-    cookies.add_private(Cookie::new("SAVED_PROVIDER", provider_name));
+    let descriptor = parse_id_token(&tokens.id_token)?;
+    let expiration = descriptor.exp;
 
-    Ok("fo".to_owned())
+    let saved = db
+        .run(move |db| UserManager::new(db).translate_user(descriptor))
+        .await?;
+
+    saved.set_as_cookie(cookies, expiration);
+    let mut provider_cookie = Cookie::new("SAVED_OAUTH_PROVIDER", provider_name);
+    provider_cookie.set_expires(OffsetDateTime::now_utc() + Duration::weeks(100));
+    cookies.add(provider_cookie);
+
+    Ok(Redirect::temporary("/"))
 }

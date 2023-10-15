@@ -4,6 +4,7 @@ pub mod models;
 mod oauth;
 pub mod response_types;
 mod schema;
+mod user_info;
 use std::env;
 
 use diesel::PgConnection;
@@ -84,5 +85,6 @@ fn rocket() -> _ {
         }))
         .mount("/", routes![index])
         .mount("/api/admin", admin_api::routes())
+        .mount("/api/users", user_info::routes())
         .mount("/", crate::oauth::routes())
 }

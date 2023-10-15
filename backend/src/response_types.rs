@@ -4,6 +4,7 @@ use rocket::{http::Status, serde::json::Json, Request};
 pub type JsonResult<T> = Result<Json<T>, QueryFailure>;
 pub type DbResult<T> = Result<T, QueryFailure>;
 
+#[derive(Debug)]
 pub struct QueryFailure {}
 
 impl<'r> Responder<'r, 'static> for QueryFailure {

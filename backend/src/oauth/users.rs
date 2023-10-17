@@ -32,6 +32,9 @@ impl RegisteredUser {
         cookies.add_private(cookie);
         Some(())
     }
+    pub fn get_id(&self) -> uuid::Uuid {
+        self.id
+    }
 }
 
 #[derive(Debug)]

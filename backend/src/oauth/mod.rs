@@ -70,7 +70,7 @@ async fn list_available_providers(db: Db) -> JsonResult<Vec<OauthProvider>> {
     .await
 }
 
-const OAUTH_SCOPES: &str = "openid profile";
+const OAUTH_SCOPES: &str = "openid profile User.Read";
 
 #[get("/oauth/flows/<provider>")]
 async fn start_flow(provider: String, db: Db, cookies: &CookieJar<'_>) -> DbResult<Redirect> {
@@ -252,5 +252,61 @@ async fn finish_flow(
     provider_cookie.set_expires(OffsetDateTime::now_utc() + Duration::weeks(100));
     cookies.add(provider_cookie);
 
+    tokio::task::spawn(async move {
+        refresh_profile_picture(db, saved.get_id(), tokens.access_token).await
+    });
+
     Ok(Redirect::temporary("/"))
+}
+
+async fn refresh_profile_picture(db: Db, user: uuid::Uuid, auth_token: String) -> Option<()> {
+    let span = tracing::span!(Level::INFO, "refresh_profile_picture");
+    let _ = span.enter();
+    let client = reqwest::Client::new();
+    let resp = client
+        .get("https://graph.microsoft.com/v1.0/me/photo/$value")
+        .header("Authorization", format!("Bearer {auth_token}"))
+        .send()
+        .await
+        .ok()?;
+
+    let body = resp.bytes().await.ok()?.to_vec();
+
+    db.run(move |db| {
+        let db_span = tracing::info_span!("insert_to_db");
+        db_span.follows_from(span);
+        let _ = db_span.enter();
+        use crate::schema::profile_pics::dsl::*;
+
+        db.transaction(move |db| {
+            let record_exists: bool =
+                diesel::select(diesel::dsl::exists(profile_pics.filter(user_id.eq(&user))))
+                    .get_result(db)?;
+
+            if record_exists {
+                let num_updated =
+                    diesel::update(profile_pics.filter(user_id.eq(&user).and(picture.ne(&body))))
+                        .set(picture.eq(&body))
+                        .execute(db)?;
+                info!("updated {num_updated} rows");
+            } else {
+                diesel::insert_into(profile_pics)
+                    .values((user_id.eq(&user), picture.eq(body)))
+                    .execute(db)?;
+            }
+
+            // diesel::insert_into(profile_pics)
+            //     .values((user_id.eq(&user), picture.eq(body)))
+            //     .on_conflict(user_id)
+            //     .do_update()
+            //     .set(picture.eq(excluded(picture)))
+            //     .execute(db)
+            //     .ok();
+            Ok::<_, QueryFailure>(())
+        })
+        .ok();
+    })
+    .await;
+
+    Some(())
 }

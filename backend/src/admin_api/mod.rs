@@ -15,7 +15,6 @@ use crate::{
     schema::{
         app_config::dsl::*,
         oauth_providers::{self, dsl::*},
-        profile_pics::user_id,
     },
     AdminPassword,
 };

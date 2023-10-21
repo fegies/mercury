@@ -10,7 +10,12 @@
 		<!-- App Bar -->
 		<AppBar>
 			<svelte:fragment slot="lead">
-				<strong class="text-xl uppercase">Mercury</strong>
+				<div class="flex items-center gap-10">
+					<a href="/" class="card p-5">
+						<strong class="text-xl uppercase">Mercury</strong>
+					</a>
+					<a href="/auctions" class="card p-5">Auctions</a>
+				</div>
 			</svelte:fragment>
 
 			<svelte:fragment slot="trail">
@@ -18,6 +23,8 @@
 			</svelte:fragment>
 		</AppBar>
 	</svelte:fragment>
-	<!-- Page Route Content -->
-	<slot />
+
+	<div class="container mx-auto">
+		<slot />
+	</div>
 </AppShell>

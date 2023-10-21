@@ -1,11 +1,5 @@
 use diesel::prelude::*;
-use rocket::{
-    figment::Provider,
-    http::{ContentType, Status},
-    serde::json::Json,
-    Route,
-};
-use uuid::Uuid;
+use rocket::{http::Status, serde::json::Json, Route};
 
 use crate::{
     admin_api::AdminUser, models::User, oauth::users::RegisteredUser, response_types::DbResult, Db,
@@ -21,7 +15,7 @@ fn me(user: RegisteredUser) -> Json<RegisteredUser> {
 }
 
 #[get("/")]
-async fn list_users(a: AdminUser, db: Db) -> DbResult<Json<Vec<RegisteredUser>>> {
+async fn list_users(_a: AdminUser, db: Db) -> DbResult<Json<Vec<RegisteredUser>>> {
     use crate::schema::users::dsl::*;
     use diesel::prelude::*;
     db.run(|db| {
@@ -33,7 +27,7 @@ async fn list_users(a: AdminUser, db: Db) -> DbResult<Json<Vec<RegisteredUser>>>
 }
 
 #[patch("/", data = "<user>")]
-async fn update_user(a: AdminUser, db: Db, user: Json<RegisteredUser>) -> DbResult<Status> {
+async fn update_user(_a: AdminUser, db: Db, user: Json<RegisteredUser>) -> DbResult<Status> {
     let user = user.0;
     db.run(move |db| {
         use crate::schema::users::dsl::*;

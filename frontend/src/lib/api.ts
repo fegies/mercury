@@ -28,12 +28,15 @@ class ApiClassBase {
         const res = await (this.fetch)(url, requestInit as any);
         if (!res.ok)
             throw new Error("Request failed!");
-        if (res.status != 204)
+
+        if (res.status === 204)
+            return undefined as any;
+        else
             return res.json();
     }
 }
 
-class AdminApiClass extends ApiClassBase {
+export class AdminApi extends ApiClassBase {
     loadConfig(): Promise<AppConfig> {
         return this.makeRequest("/api/admin/config");
     }
@@ -79,5 +82,4 @@ export class UserApi extends ApiClassBase {
         });
     }
 }
-export const AdminApi = new AdminApiClass();
 export const OAuthApi = new OauthApiClass();

@@ -78,5 +78,14 @@
               ];
             };
           });
+      packages = forEachSystem
+        (system:
+          let pkgs = nixpkgs.legacyPackages.${system}; in {
+            server = pkgs.callPackage (import ./nix/backend_package.nix)
+              {
+                sources = ./backend;
+              };
+            frontend = pkgs.callPackage (import ./nix/frontend_package.nix) { sources = ./frontend; };
+          });
     };
 }

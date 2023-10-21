@@ -2,7 +2,6 @@ use std::str::FromStr;
 
 use diesel::prelude::*;
 use diesel::upsert::excluded;
-use rocket::fairing::Fairing;
 use rocket::http::Header;
 use rocket::{http::ContentType, Route};
 use sha2::Digest;

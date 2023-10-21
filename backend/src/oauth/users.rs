@@ -2,10 +2,10 @@ use crate::models::User;
 use crate::schema::{external_users::dsl::*, users::dsl::*};
 use cookie::time::OffsetDateTime;
 use cookie::{Cookie, SameSite};
+use diesel::prelude::*;
 use diesel::PgConnection;
-use diesel::{prelude::*, result};
 use rocket::http::{CookieJar, Status};
-use rocket::request::{self, FromRequest, Outcome};
+use rocket::request::{self, FromRequest};
 use rocket::Request;
 use serde::{Deserialize, Serialize};
 

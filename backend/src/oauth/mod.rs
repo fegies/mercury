@@ -137,6 +137,7 @@ fn handle_interaction_required(provider: String, cookies: &CookieJar<'_>) -> Red
     Redirect::temporary(format!("/oauth/flows/{provider}"))
 }
 
+#[allow(unused_variables)]
 #[get(
     "/oauth/flows/<provider>/callback?<error>&<error_description>",
     rank = 1

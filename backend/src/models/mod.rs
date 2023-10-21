@@ -18,4 +18,5 @@ pub struct User {
     pub user_id: Uuid,
     pub display_name: String,
     pub preferred_username: String,
+    pub can_start_auctions: bool,
 }

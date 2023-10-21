@@ -4,10 +4,13 @@ create table users(
     user_id uuid primary key not null default gen_random_uuid()
     ,display_name text not null
     ,preferred_username text not null
+    ,can_start_auctions boolean not null default false
 );
 
 create table profile_pics(
     user_id uuid primary key not null references users(user_id) on delete cascade
+    , hash uuid not null
+    , mime_type text null
     , picture bytea not null
 );
 
@@ -17,4 +20,3 @@ create table external_users(
     , issuer_sub text not null
     , constraint external_users_pk primary key(issuer, issuer_sub)
 );
-create index external_users_issuer_subject_idx on external_users(issuer, issuer_sub);

@@ -28,6 +28,8 @@ diesel::table! {
 diesel::table! {
     profile_pics (user_id) {
         user_id -> Uuid,
+        hash -> Uuid,
+        mime_type -> Nullable<Text>,
         picture -> Bytea,
     }
 }
@@ -37,6 +39,7 @@ diesel::table! {
         user_id -> Uuid,
         display_name -> Text,
         preferred_username -> Text,
+        can_start_auctions -> Bool,
     }
 }
 

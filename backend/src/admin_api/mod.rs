@@ -15,6 +15,7 @@ use crate::{
     schema::{
         app_config::dsl::*,
         oauth_providers::{self, dsl::*},
+        profile_pics::user_id,
     },
     AdminPassword,
 };
@@ -45,7 +46,7 @@ impl<'r> FromRequest<'r> for AdminUser {
             .map(|cookie| cookie.value() == "MERCURY_IS_ADMIN")
             .unwrap_or(false);
         if is_validated {
-            Outcome::Success(AdminUser)
+            Outcome::Success(AdminUser {})
         } else {
             cookies.remove(Cookie::named("MERCURY_IS_ADMIN"));
             Outcome::Failure((Status::Unauthorized, ()))
@@ -53,7 +54,8 @@ impl<'r> FromRequest<'r> for AdminUser {
     }
 }
 
-struct AdminUser;
+#[non_exhaustive]
+pub struct AdminUser {}
 
 #[post("/login", data = "<admin_pw>")]
 fn login(

@@ -19,6 +19,9 @@
 						>
 					</span>
 				</li>
+			{:else}
+				No Oauth provider configured so far. Please visit the <a href="/admin">Admin page</a> to configure
+				some.
 			{/each}
 		</ul>
 	{/await}

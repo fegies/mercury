@@ -20,6 +20,18 @@ pub struct RegisteredUser {
     id: uuid::Uuid,
     name: String,
     preferred_username: String,
+    pub can_start_auctions: bool,
+}
+
+impl From<User> for RegisteredUser {
+    fn from(value: User) -> Self {
+        Self {
+            id: value.user_id,
+            name: value.display_name,
+            preferred_username: value.preferred_username,
+            can_start_auctions: value.can_start_auctions,
+        }
+    }
 }
 
 impl RegisteredUser {
@@ -87,11 +99,7 @@ impl<'a> UserManager<'a> {
             self.create_user_registration(user)?
         };
 
-        Ok(RegisteredUser {
-            id: existing_user.user_id,
-            name: existing_user.display_name,
-            preferred_username: existing_user.preferred_username,
-        })
+        Ok(existing_user.into())
     }
 
     fn update_user_registration(

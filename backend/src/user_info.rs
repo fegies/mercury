@@ -1,11 +1,18 @@
-use diesel::{QueryDsl, RunQueryDsl};
-use rocket::{figment::Provider, http::ContentType, serde::json::Json, Route};
+use diesel::prelude::*;
+use rocket::{
+    figment::Provider,
+    http::{ContentType, Status},
+    serde::json::Json,
+    Route,
+};
 use uuid::Uuid;
 
-use crate::{oauth::users::RegisteredUser, Db};
+use crate::{
+    admin_api::AdminUser, models::User, oauth::users::RegisteredUser, response_types::DbResult, Db,
+};
 
 pub fn routes() -> Vec<Route> {
-    routes![me, picture]
+    routes![me, list_users, update_user]
 }
 
 #[get("/me")]
@@ -13,21 +20,27 @@ fn me(user: RegisteredUser) -> Json<RegisteredUser> {
     Json(user)
 }
 
-#[get("/picture/<user_id>")]
-async fn picture(_user: RegisteredUser, user_id: &str, db: Db) -> Option<(ContentType, Vec<u8>)> {
-    let user = Uuid::parse_str(&user_id).ok()?;
-    let picture = db
-        .run(move |db| {
-            use crate::schema::profile_pics::dsl::*;
-            use diesel::prelude::*;
+#[get("/")]
+async fn list_users(a: AdminUser, db: Db) -> DbResult<Json<Vec<RegisteredUser>>> {
+    use crate::schema::users::dsl::*;
+    use diesel::prelude::*;
+    db.run(|db| {
+        let u: Vec<User> = users.load(db)?;
+        let u = u.into_iter().map(|u| u.into()).collect();
+        Ok(Json(u))
+    })
+    .await
+}
 
-            profile_pics
-                .filter(user_id.eq(&user))
-                .select(picture)
-                .first(db)
-                .ok()
-        })
-        .await?;
-
-    Some((ContentType::Binary, picture))
+#[patch("/", data = "<user>")]
+async fn update_user(a: AdminUser, db: Db, user: Json<RegisteredUser>) -> DbResult<Status> {
+    let user = user.0;
+    db.run(move |db| {
+        use crate::schema::users::dsl::*;
+        diesel::update(users.filter(user_id.eq(user.get_id())))
+            .set(can_start_auctions.eq(user.can_start_auctions))
+            .execute(db)?;
+        Ok(Status::NoContent)
+    })
+    .await
 }

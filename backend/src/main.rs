@@ -1,5 +1,6 @@
 // mod api;
 mod admin_api;
+pub mod avatars;
 pub mod models;
 mod oauth;
 pub mod response_types;
@@ -86,5 +87,6 @@ fn rocket() -> _ {
         .mount("/", routes![index])
         .mount("/api/admin", admin_api::routes())
         .mount("/api/users", user_info::routes())
+        .mount("/api/users/picture", avatars::routes())
         .mount("/", crate::oauth::routes())
 }

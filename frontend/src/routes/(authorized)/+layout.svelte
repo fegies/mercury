@@ -1,13 +1,8 @@
 <script lang="ts">
-	import { AppBar, AppShell, Avatar } from '@skeletonlabs/skeleton';
-	import type { LayoutData } from '../$types';
+	import { AppBar, AppShell } from '@skeletonlabs/skeleton';
+	import UserAvatar from '$lib/components/common/user_avatar.svelte';
 
-	export let data: LayoutData;
-	$: initials = (data?.me?.name ?? '')
-		.split(/\s/)
-		.map((w: string) => w[0])
-		.join('')
-		.substring(0, 2);
+	export let data: { me: User };
 </script>
 
 <AppShell>
@@ -19,7 +14,7 @@
 			</svelte:fragment>
 
 			<svelte:fragment slot="trail">
-				<Avatar src="/api/users/picture/{data.me.id}" {initials} />
+				<UserAvatar user={data?.me} />
 			</svelte:fragment>
 		</AppBar>
 	</svelte:fragment>

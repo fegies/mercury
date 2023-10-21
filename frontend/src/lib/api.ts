@@ -69,7 +69,15 @@ export class UserApi extends ApiClassBase {
     get_me(): Promise<User> {
         return this.makeRequest('/api/users/me');
     }
+    list_users(): Promise<User[]> {
+        return this.makeRequest('/api/users');
+    }
+    updateUser(user: User): Promise<void> {
+        return this.makeRequest('/api/users', {
+            method: 'PATCH',
+            body: user,
+        });
+    }
 }
-
 export const AdminApi = new AdminApiClass();
 export const OAuthApi = new OauthApiClass();

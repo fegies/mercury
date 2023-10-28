@@ -24,7 +24,7 @@
 		</AppBar>
 	</svelte:fragment>
 
-	<div class="container mx-auto">
+	<div class="container mx-auto mt-10">
 		<slot />
 	</div>
 </AppShell>

@@ -8,6 +8,35 @@ diesel::table! {
 }
 
 diesel::table! {
+    auction_item (id) {
+        id -> Uuid,
+        item_name -> Text,
+        description -> Nullable<Text>,
+    }
+}
+
+diesel::table! {
+    auctions (id) {
+        id -> Uuid,
+        item_id -> Uuid,
+        end_time -> Timestamptz,
+        multiplicity -> Int4,
+        minimum_bid -> Numeric,
+    }
+}
+
+diesel::table! {
+    bids (id) {
+        id -> Int4,
+        auction_id -> Uuid,
+        creator_id -> Nullable<Uuid>,
+        modification_time -> Timestamptz,
+        current_value -> Numeric,
+        max_value -> Numeric,
+    }
+}
+
+diesel::table! {
     external_users (issuer, issuer_sub) {
         internal_user -> Uuid,
         issuer -> Text,
@@ -43,11 +72,17 @@ diesel::table! {
     }
 }
 
+diesel::joinable!(auctions -> auction_item (item_id));
+diesel::joinable!(bids -> auctions (auction_id));
+diesel::joinable!(bids -> users (creator_id));
 diesel::joinable!(external_users -> users (internal_user));
 diesel::joinable!(profile_pics -> users (user_id));
 
 diesel::allow_tables_to_appear_in_same_query!(
     app_config,
+    auction_item,
+    auctions,
+    bids,
     external_users,
     oauth_providers,
     profile_pics,

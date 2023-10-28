@@ -80,7 +80,8 @@
           });
       packages = forEachSystem
         (system:
-          let pkgs = nixpkgs.legacyPackages.${system}; in {
+          let pkgs = nixpkgs.legacyPackages.${system}; in
+          {
             server = pkgs.callPackage (import ./nix/backend_package.nix)
               {
                 sources = ./backend;

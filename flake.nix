@@ -45,6 +45,7 @@
                     cargo-watch
                     mold
                     openssl
+                    jq
                   ];
 
                   languages.rust = {

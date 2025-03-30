@@ -47,8 +47,8 @@ impl<'r> FromRequest<'r> for AdminUser {
         if is_validated {
             Outcome::Success(AdminUser {})
         } else {
-            cookies.remove(Cookie::named("MERCURY_IS_ADMIN"));
-            Outcome::Failure((Status::Unauthorized, ()))
+            cookies.remove(Cookie::from("MERCURY_IS_ADMIN"));
+            Outcome::Error((Status::Unauthorized, ()))
         }
     }
 }

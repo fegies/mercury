@@ -133,7 +133,7 @@ impl From<reqwest::Error> for OAuthFailure {
 
 #[get("/oauth/flows/<provider>/callback?error=interaction_required")]
 fn handle_interaction_required(provider: String, cookies: &CookieJar<'_>) -> Redirect {
-    cookies.remove(Cookie::named("SAVED_PROVIDER"));
+    cookies.remove(Cookie::from("SAVED_PROVIDER"));
     Redirect::temporary(format!("/oauth/flows/{provider}"))
 }
 
@@ -185,7 +185,7 @@ async fn finish_flow(
     if &state != saved_state.value() {
         return Err(OAuthFailure::StateError("state does not match"));
     }
-    cookies.remove(Cookie::named("OAUTH_STATE"));
+    cookies.remove(Cookie::from("OAUTH_STATE"));
 
     #[derive(Serialize)]
     struct TokenParams {

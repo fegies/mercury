@@ -12,10 +12,10 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"]}
 diesel = { version = "2.1.0", features = ["postgres", "r2d2","uuid"] }
 diesel_migrations = {version = "2.1.0"}
 dotenvy = "0.15"
-cookie = {version = "0.17", features = ["secure"]}
+cookie = {version = "0.18", features = ["secure"]}
 serde = { version = "1.0.188", features = ["derive"] }
 serde_json = "1.0.107"
-rocket = { version = "0.5.0-rc.3", features = ["json", "secrets", "serde_json"] }
+rocket = { version = "0.5.1", features = ["json", "secrets", "serde_json"] }
 rocket_sync_db_pools = { version = "0.1.0-rc.3", features = ["diesel", "diesel_postgres_pool"] }
 rand = "0.8.5"
 url = "2.4.1"

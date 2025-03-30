@@ -72,7 +72,7 @@ impl<'r> FromRequest<'r> for RegisteredUser {
         }
         match inner(req) {
             Ok(user) => rocket::outcome::Outcome::Success(user),
-            Err(err) => rocket::outcome::Outcome::Failure((Status::Forbidden, err)),
+            Err(err) => rocket::outcome::Outcome::Error((Status::Forbidden, err)),
         }
     }
 }

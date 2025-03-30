@@ -15,11 +15,16 @@
 						<strong class="text-xl uppercase">Mercury</strong>
 					</a>
 					<a href="/auctions" class="card p-5">Auctions</a>
+					{#if data.me.can_start_auctions}
+						<a href="/manage-auctions" class="card p-5">Manage Auctions</a>
+					{/if}
 				</div>
 			</svelte:fragment>
 
 			<svelte:fragment slot="trail">
-				<UserAvatar user={data?.me} />
+				<div>
+					<UserAvatar user={data?.me} />
+				</div>
 			</svelte:fragment>
 		</AppBar>
 	</svelte:fragment>

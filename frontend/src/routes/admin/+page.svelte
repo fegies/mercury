@@ -3,8 +3,6 @@
 	import { AdminApi, UserApi } from '$lib/api';
 	import OauthConfigList from '$lib/components/admin/oauth_config_list.svelte';
 	import UserConfiguration from '$lib/components/admin/user_configuration.svelte';
-	import type { AppConfig } from '$lib/types/oauth_providers';
-	import { Autocomplete, SlideToggle } from '@skeletonlabs/skeleton';
 
 	export let data;
 

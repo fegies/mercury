@@ -57,7 +57,7 @@ diesel::table! {
 diesel::table! {
     profile_pics (user_id) {
         user_id -> Uuid,
-        hash -> Uuid,
+        hash -> Text,
         mime_type -> Nullable<Text>,
         picture -> Bytea,
     }

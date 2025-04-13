@@ -4,4 +4,5 @@ type User = {
     name: string,
     preferred_username: string,
     can_start_auctions: boolean,
+    roles: string[],
 };

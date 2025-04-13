@@ -29,19 +29,10 @@
 	{#each oauth_providers as provider}
 		<div class="card p-2">
 			<OAuthProviderComponent bind:provider {app_config} />
-			<button
-				type="button"
-				class="btn variant-filled-primary"
-				on:click={() => save_provider(provider)}>Save</button
-			>
-			<button
-				type="button"
-				class="btn variant-filled-warning"
-				on:click={() => deleteProvider(provider)}>Delete</button
-			>
+			<button type="button" class="btn" on:click={() => save_provider(provider)}>Save</button>
+			<button type="button" class="btn" on:click={() => deleteProvider(provider)}>Delete</button>
 		</div>
 	{/each}
 </div>
 <hr class="!border-t-4" />
-<button type="button" class="btn variant-filled" on:click={add_provider}>Add oauth2 provider</button
->
+<button type="button" class="btn" on:click={add_provider}>Add oauth2 provider</button>

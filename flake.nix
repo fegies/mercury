@@ -59,13 +59,14 @@
               };
 
               enterShell = ''
-                pg_url="postgres://$(whoami)@$(readlink -f ./.devenv/run/postgres | jq -rR '.|@uri')/mercury"
+                pg_path="$(readlink -f ./.devenv/run/postgres)"
+                pg_url="postgres://$(whoami)@$(echo "$pg_path" | jq -rR '.|@uri')/mercury"
                 (
-                  echo "DATABASE_URL=$pg_url"
-                  echo "FRONTEND_DIR=../frontend/build"
+                  echo "PGSOCKET=$pg_path"
+                  echo "PG_URL=$pg_url"
                   echo "ADMIN_PASSWORD=devpw"
                   echo "COOKIE_KEY=devkey"
-                ) > backend/.env
+                ) > frontend/.env
               '';
 
               services.postgres = {
@@ -77,7 +78,7 @@
               };
 
               processes = {
-                backend.exec = "cd backend && export RUST_BACKTRACE=1 && exec cargo watch -x run";
+                # backend.exec = "cd backend && export RUST_BACKTRACE=1 && exec cargo watch -x run";
                 frontend.exec = "cd frontend && exec npm run dev";
               };
             }

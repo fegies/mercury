@@ -1,12 +1,11 @@
 <script lang="ts">
-	import { Avatar } from '@skeletonlabs/skeleton';
+	import { Avatar } from '@skeletonlabs/skeleton-svelte';
 
-	export let user: User;
-	let initials = user.name
-		.split(/\s/)
-		.map((w: string) => w[0])
-		.join('')
-		.substring(0, 2);
+	let {
+		user
+	}: {
+		user: User;
+	} = $props();
 </script>
 
-<Avatar src="/api/users/picture/{user.id}" {initials} />
+<Avatar src="/api/users/picture/{user.id}" name={user.name} />

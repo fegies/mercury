@@ -30,6 +30,6 @@
 				bind:value={admin_key}
 			/>
 		</label>
-		<button type="button" class="btn variant-filled" on:click={attempt_login}>Login</button>
+		<button type="button" class="btn" on:click={attempt_login}>Login</button>
 	</div>
 </div>

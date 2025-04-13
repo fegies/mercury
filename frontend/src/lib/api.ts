@@ -62,7 +62,7 @@ export class AdminApi extends ApiClassBase {
     }
 }
 
-class OauthApiClass extends ApiClassBase {
+export class OAuthApi extends ApiClassBase {
     listProviders(): Promise<{ provider_name: string, flow_url: string }[]> {
         return this.makeRequest("/api/oauth/providers");
     }
@@ -82,4 +82,3 @@ export class UserApi extends ApiClassBase {
         });
     }
 }
-export const OAuthApi = new OauthApiClass();

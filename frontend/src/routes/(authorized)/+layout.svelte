@@ -14,6 +14,7 @@
 				<strong class="text-xl uppercase">Mercury</strong>
 			</a>
 			<a href="/auctions" class="card p-5">Auctions</a>
+			<a href="/mybids" class="card p-5">My Bids</a>
 			{#if data.me.can_start_auctions}
 				<a href="/manage-auctions" class="card p-5">Manage Auctions</a>
 			{/if}
@@ -21,9 +22,11 @@
 	{/snippet}
 
 	{#snippet trail()}
-		<div>
-			<UserAvatar user={data?.me} />
-		</div>
+		<UserAvatar user={data?.me}>
+			{#snippet menu()}
+				<a href="/logout">Logout</a>
+			{/snippet}
+		</UserAvatar>
 	{/snippet}
 </AppBar>
 

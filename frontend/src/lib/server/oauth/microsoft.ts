@@ -27,7 +27,12 @@ export class MicrosoftProvider implements OAuthProvider {
     get_name(): string {
         return this.name;
     }
-    async start_flow(cookies: Cookies): Promise<never> {
+
+    start_flow(cookies: Cookies): Promise<never> {
+        return this.start_flow_inner(cookies, false);
+    }
+
+    async start_flow_inner(cookies: Cookies, ignore_saved_provider: boolean): Promise<never> {
         const state = await random_string();
         const expiresAt = new Date().getTime() + 1000 * 5 * 60;
         cookies.set('OAUTH_STATE', state, {
@@ -44,7 +49,7 @@ export class MicrosoftProvider implements OAuthProvider {
         params.set('state', state);
         params.set('response_type', 'code');
 
-        if (cookies.get('SAVED_OAUTH_PROVIDER') === this.name)
+        if (!ignore_saved_provider && cookies.get('SAVED_OAUTH_PROVIDER') === this.name)
             params.set('prompt', 'none');
         const trigger_url = `https://login.microsoftonline.com/${this.tenant}/oauth2/v2.0/authorize?${params}`;
         return redirect(302, trigger_url);
@@ -55,6 +60,14 @@ export class MicrosoftProvider implements OAuthProvider {
         const state = query_params.get('state');
         if (!state || state !== event.cookies.get('OAUTH_STATE'))
             throw error(400, 'bad state');
+
+        switch (query_params.get('error')) {
+            case 'login_required':
+            case 'interaction_required':
+                await this.start_flow_inner(event.cookies, true);
+                break;
+        }
+
         event.cookies.delete('OAUTH_STATE', { path: '' });
 
         const body = new FormData();
@@ -69,8 +82,10 @@ export class MicrosoftProvider implements OAuthProvider {
             method: 'POST',
             body,
         });
-        if (!token_response.ok)
+        if (!token_response.ok) {
             throw error(500, await token_response.text())
+        }
+
 
         const token_body: {
             access_token: string;
@@ -80,7 +95,7 @@ export class MicrosoftProvider implements OAuthProvider {
             id_token: string;
         } = await token_response.json();
 
-        const expiration_time = new Date(new Date().getTime() + token_body.expires_in * 1000);
+        const expiration_time = new Date(new Date().getTime() + 12 * 60 * 60 * 1000);
         const parsed_token = parse_id_token(token_body.id_token);
         const { user, session_id } = await SessionStore.exchange_oauth_user(parsed_token.iss, parsed_token.sub, parsed_token.preferred_username, parsed_token.name, expiration_time);
 

@@ -16,6 +16,10 @@ export const SessionStore = {
         return sessions.get(session_id);
     },
 
+    logout(session_id: string) {
+        sessions.delete(session_id);
+    },
+
     async exchange_oauth_user(issuer: string
         , issuer_sub: string
         , issuer_username: string

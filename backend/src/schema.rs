@@ -8,6 +8,15 @@ diesel::table! {
 }
 
 diesel::table! {
+    auction_images (id) {
+        id -> Int4,
+        auction_item_id -> Uuid,
+        hash -> Text,
+        content -> Bytea,
+    }
+}
+
+diesel::table! {
     auction_item (id) {
         id -> Uuid,
         item_name -> Text,
@@ -72,6 +81,7 @@ diesel::table! {
     }
 }
 
+diesel::joinable!(auction_images -> auction_item (auction_item_id));
 diesel::joinable!(auctions -> auction_item (item_id));
 diesel::joinable!(bids -> auctions (auction_id));
 diesel::joinable!(bids -> users (creator_id));
@@ -80,6 +90,7 @@ diesel::joinable!(profile_pics -> users (user_id));
 
 diesel::allow_tables_to_appear_in_same_query!(
     app_config,
+    auction_images,
     auction_item,
     auctions,
     bids,

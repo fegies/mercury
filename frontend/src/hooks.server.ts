@@ -1,5 +1,5 @@
 import { SessionStore, type AuthHandler, type AuthResult, type RequestedAuthRole } from "$lib/server/auth";
-import { redirect, type Cookies, type Handle } from "@sveltejs/kit";
+import { redirect, type Cookies, type Handle, type HandleServerError } from "@sveltejs/kit";
 
 
 
@@ -9,8 +9,6 @@ export const handle: Handle = async ({ event, resolve }) => {
 
     return await resolve(event);
 }
-
-
 
 function build_authorize(cookies: Cookies): AuthHandler {
     let user_prom: Promise<User> | null = null;
@@ -23,7 +21,7 @@ function build_authorize(cookies: Cookies): AuthHandler {
                 return user;
         }
 
-        throw redirect(302, '/oauth');
+        redirect(302, '/oauth');
     }
 
     return async (requested_role) => {

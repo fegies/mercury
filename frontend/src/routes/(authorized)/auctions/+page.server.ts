@@ -10,11 +10,12 @@ export const load: PageServerLoad = async ({ locals, params }) => {
     const auctions = await sql<{
         id: string,
         item_name: string,
+        end_time: Date,
         description: string,
         current_value: number,
         first_image: string | null,
     }[]>`
-        select a.id, i.item_name, i.description
+        select a.id, i.item_name, i.description, a.end_time
         , (
             select coalesce(max(current_value), a.minimum_bid) from bids b
             where b.auction_id = a.id
@@ -29,6 +30,7 @@ export const load: PageServerLoad = async ({ locals, params }) => {
         inner join auction_item i
         on i.id = a.item_id
         where a.end_time > now()
+        order by a.end_time asc
     `;
 
     return {

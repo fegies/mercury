@@ -144,7 +144,6 @@ async function refresh_profile_pic(user_id: string, auth_token: string): Promise
 
 }
 
-
 function parse_id_token(token: string): {
     iss: string;
     sub: string;

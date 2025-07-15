@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Imageset from '$lib/components/common/imageset.svelte';
 	import type { PageData } from './$types';
 
 	export let data: PageData;
@@ -8,4 +9,10 @@
 	<title>Auction</title>
 </svelte:head>
 
-<h1 class="h1">Auction {data.test}</h1>
+<div class="flex flex-col gap-10">
+	<h1 class="h1">{data.auction.item_name}</h1>
+	<Imageset links={data.image_links}></Imageset>
+	<div>
+		{data.auction.description}
+	</div>
+</div>

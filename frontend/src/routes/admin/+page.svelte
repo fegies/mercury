@@ -33,7 +33,7 @@
 		</div>
 	</div>
 	<div class="p-10">
-		<OauthConfigList app_config={data.config} oauth_providers={data.oauth_providers} />
+		<!-- <OauthConfigList app_config={data.config} oauth_providers={data.oauth_providers} /> -->
 	</div>
 
 	<div class="p-10">

@@ -66,6 +66,8 @@
                   echo "PG_URL=$pg_url"
                   echo "ADMIN_PASSWORD=devpw"
                   echo "COOKIE_KEY=devkey"
+
+                  echo "PUBLIC_PAGE_BRANDING=mercury"
                 ) > frontend/.env
               '';
 

@@ -11,7 +11,7 @@
 	{#snippet lead()}
 		<div class="flex items-center gap-10">
 			<a href="/" class="card p-5">
-				<strong class="text-xl uppercase">Mercury</strong>
+				<strong class="text-xl uppercase">{data.branding}</strong>
 			</a>
 			<a href="/auctions" class="card p-5">Auctions</a>
 			<a href="/mybids" class="card p-5">My Bids</a>

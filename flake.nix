@@ -66,6 +66,7 @@
                   echo "PG_URL=$pg_url"
                   echo "ADMIN_PASSWORD=devpw"
                   echo "COOKIE_KEY=devkey"
+                  echo "DEPLOYMENT_DOMAIN=http://localhost:5173"
 
                   echo "PUBLIC_PAGE_BRANDING=mercury"
                 ) > frontend/.env

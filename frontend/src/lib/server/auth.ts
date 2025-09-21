@@ -32,18 +32,25 @@ export const SessionStore = {
             let r = await sql`select internal_user from external_users
             where issuer = ${issuer} and issuer_sub = ${issuer_sub}`;
             if (r.count == 0) {
+                const [{ user_id }] = await sql`insert into users (display_name, preferred_username)
+                values (${issuer_display_name}, ${issuer_username})
+                returning user_id`;
+
                 r = await sql`insert into external_users (internal_user, issuer, issuer_sub)
-                values (gen_random_uuid(), ${issuer}, ${issuer_sub})
+                values (${user_id}, ${issuer}, ${issuer_sub})
                 returning internal_user`;
             }
-            const [{ internal_user }] = r;
+            else {
+                const [{ internal_user }] = r;
 
-            await sql`insert into users (user_id, display_name, preferred_username)
-            values (${internal_user}, ${issuer_display_name}, ${issuer_username})
-            on conflict(user_id) do update
-            set display_name = excluded.display_name
-            , preferred_username = excluded.preferred_username
-            where users.display_name <> excluded.display_name or users.preferred_username <> excluded.preferred_username`;
+                await sql`update users
+                set display_name = ${issuer_display_name}
+                , preferred_username = ${issuer_username}
+                where user_id = ${internal_user}
+                and (display_name <> ${issuer_display_name} or preferred_username <> ${issuer_username})`;
+
+            }
+            const [{ internal_user }] = r;
 
             const [{ can_start_auctions }] = await sql`select can_start_auctions from users
             where user_id = ${internal_user}`;

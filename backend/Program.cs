@@ -1,0 +1,138 @@
+using System.IdentityModel.Tokens.Jwt;
+using System.Reflection;
+using System.Text;
+using System.Text.Json;
+using backend.Auth;
+using backend.Configuration;
+using backend.Data;
+using backend.Errors;
+using backend.Services;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authentication.OpenIdConnect;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Protocols.OpenIdConnect;
+
+var builder = WebApplication.CreateBuilder(args);
+
+var IsRealLaunch = Assembly.GetEntryAssembly() == Assembly.GetExecutingAssembly();
+
+var config = new BackendConfig();
+builder.Configuration.Bind(config);
+if (IsRealLaunch)
+    config.Validate();
+
+builder.Services.AddSingleton(config);
+builder.Services.AddScoped<UserProvisionService>();
+
+switch (config.OidcConfig.ProviderType)
+{
+    case OidcConfigurationValue.ProviderTypeValue.Zitadel:
+        builder.Services.AddScoped<IUserProvisioner, ZitadelUserProvisioner>();
+        break;
+    default:
+        builder.Services.AddScoped<IUserProvisioner, GeneriUserProvisioner>();
+        break;
+}
+
+builder.Services.AddDbContext<ApplicationDbContext>(options => options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+
+builder.Services.AddAuthentication(options =>
+{
+    options.DefaultScheme = CookieAuthenticationDefaults.AuthenticationScheme;
+    options.DefaultChallengeScheme = OpenIdConnectDefaults.AuthenticationScheme;
+})
+.AddCookie()
+.AddOpenIdConnect(options =>
+{
+    var oidcConf = config.OidcConfig;
+    options.Authority = oidcConf.AuthorityUrl;
+    options.ClientId = oidcConf.ClientId;
+    options.ClientSecret = oidcConf.ClientSecret;
+    options.SignInScheme = CookieAuthenticationDefaults.AuthenticationScheme;
+    options.ResponseType = OpenIdConnectResponseType.Code;
+
+    options.Scope.Clear();
+    options.Scope.Add("openid");
+    options.Scope.Add("profile");
+    options.Scope.Add("email");
+
+    options.SaveTokens = true;
+    options.GetClaimsFromUserInfoEndpoint = true;
+    options.TokenValidationParameters.NameClaimType = JwtRegisteredClaimNames.Name;
+    options.TokenValidationParameters.RoleClaimType = "role";
+    options.MapInboundClaims = false;
+
+    options.Events.OnTicketReceived += async (ctx) =>
+    {
+        await ctx.HttpContext.RequestServices.GetRequiredService<UserProvisionService>().ProvisionUser(ctx.Principal!);
+    };
+});
+builder.Services.ConfigureHttpJsonOptions(options =>
+{
+    options.SerializerOptions.NumberHandling = System.Text.Json.Serialization.JsonNumberHandling.Strict;
+});
+
+builder.Services.AddControllers();
+
+// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
+builder.Services.AddOpenApi(options =>
+{
+    options.ShouldInclude = (_) => true;
+});
+
+builder.Services.AddSingleton<IAuthorizationHandler, IsAdminRequirementHandler>();
+
+var requireAuthPolicy = new AuthorizationPolicyBuilder()
+    .RequireAuthenticatedUser()
+    .Build();
+
+builder.Services.AddAuthorizationBuilder()
+    .AddPolicy("IsAdmin", p => p.AddRequirements(new IsAdminRequirement()))
+    .SetFallbackPolicy(requireAuthPolicy);
+
+var app = builder.Build();
+
+app.Use(async (ctx, next) =>
+{
+    try
+    {
+        await next();
+    }
+    catch (WebStatusException e)
+    {
+        var res = ctx.Response;
+        res.StatusCode = e.StatusCode;
+        if (e.Message != null)
+        {
+            Encoding.UTF8.GetBytes(e.Message, res.BodyWriter);
+            await res.BodyWriter.FlushAsync();
+        }
+    }
+});
+
+app.UseRouting();
+
+// Configure the HTTP request pipeline.
+if (app.Environment.IsDevelopment())
+{
+    app.MapOpenApi();
+}
+
+
+// app.UseHttpsRedirection();
+app.UseAuthentication();
+app.UseAuthorization();
+
+
+
+app.MapControllers();
+
+if (IsRealLaunch)
+{
+    // this at least looks like a real startup. 
+    using var scope = app.Services.CreateScope();
+    scope.ServiceProvider.GetRequiredService<ApplicationDbContext>().Database.Migrate();
+}
+
+app.Run();

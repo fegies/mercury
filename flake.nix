@@ -1,11 +1,7 @@
 {
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-24.11";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-26.05";
     systems.url = "github:nix-systems/default";
-    fenix = {
-      url = "github:nix-community/fenix";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
     devenv = {
       url = "github:cachix/devenv";
       inputs = {
@@ -24,7 +20,6 @@
     nixpkgs,
     devenv,
     systems,
-    fenix,
     ...
   } @ inputs: let
     forEachSystem = nixpkgs.lib.genAttrs (import systems);
@@ -40,41 +35,23 @@
             {
               # https://devenv.sh/reference/options/
               packages = with pkgs; [
-                nodejs_20
-                nodePackages.prettier
+                nodejs_26
+                prettier
                 postgresql
-                diesel-cli
-                rustfmt
-                gcc
-                cargo-watch
-                mold
-                openssl
                 jq
+                dotnet-ef
               ];
 
-              languages.rust = {
-                enable = true;
-                channel = "stable";
-                components = ["rustc" "cargo" "clippy" "rustfmt" "rust-analyzer" "rust-src"];
+              languages = {
+                dotnet = {
+                  enable = true;
+                  package = pkgs.dotnet-sdk_10;
+                };
               };
-
-              enterShell = ''
-                pg_path="$(readlink -f ./.devenv/run/postgres)"
-                pg_url="postgres://$(whoami)@$(echo "$pg_path" | jq -rR '.|@uri')/mercury"
-                (
-                  echo "PGSOCKET=$pg_path"
-                  echo "PG_URL=$pg_url"
-                  echo "ADMIN_PASSWORD=devpw"
-                  echo "COOKIE_KEY=devkey"
-                  echo "DEPLOYMENT_DOMAIN=http://localhost:5173"
-
-                  echo "PUBLIC_PAGE_BRANDING=mercury"
-                ) > frontend/.env
-              '';
 
               services.postgres = {
                 enable = true;
-                package = pkgs.postgresql_16;
+                package = pkgs.postgresql_18;
                 initialDatabases = [
                   {name = "mercury";}
                 ];

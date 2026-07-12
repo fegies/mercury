@@ -1,4 +1,5 @@
 <script lang="ts">
+	import type { UserInfo } from '$lib/client/types.gen';
 	import { Avatar } from '@skeletonlabs/skeleton-svelte';
 	import type { Snippet } from 'svelte';
 
@@ -6,7 +7,7 @@
 		user,
 		menu
 	}: {
-		user: User;
+		user: UserInfo;
 		menu: Snippet;
 	} = $props();
 
@@ -19,7 +20,7 @@
 
 <div>
 	<button onclick={toggleMenu}>
-		<Avatar src="/api/users/picture/{user.id}" name={user.name} />
+		<Avatar src={user.profilePictureUrl || undefined} name={user.name} />
 	</button>
 
 	{#if menu_open}

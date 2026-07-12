@@ -1,0 +1,97 @@
+{
+  "openapi": "3.1.1",
+  "info": {
+    "title": "backend | v1",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/api/userinfo/me": {
+      "get": {
+        "tags": [
+          "UserInfo"
+        ],
+        "summary": "Return information about the currently signed in user.",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/Me"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Me"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Me"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Me": {
+        "required": [
+          "userinfo"
+        ],
+        "type": "object",
+        "properties": {
+          "userinfo": {
+            "description": "The current user.",
+            "$ref": "#/components/schemas/UserInfo"
+          },
+          "canStartAuctions": {
+            "type": "boolean",
+            "description": "A boolean detailing if the current user can start and manage auctions"
+          }
+        },
+        "description": "An object describing the current user."
+      },
+      "UserInfo": {
+        "required": [
+          "id",
+          "name"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "my user id"
+          },
+          "name": {
+            "type": "string",
+            "description": "display name"
+          },
+          "email": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Email address"
+          },
+          "profilePictureUrl": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Profile picture url"
+          }
+        },
+        "description": "An object describing a current user"
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "UserInfo"
+    }
+  ]
+}

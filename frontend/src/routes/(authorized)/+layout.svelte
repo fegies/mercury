@@ -15,16 +15,16 @@
 			</a>
 			<a href="/auctions" class="card p-5">Auctions</a>
 			<a href="/mybids" class="card p-5">My Bids</a>
-			{#if data.me.can_start_auctions}
+			{#if data.me}
 				<a href="/manage-auctions" class="card p-5">Manage Auctions</a>
 			{/if}
 		</div>
 	{/snippet}
 
 	{#snippet trail()}
-		<UserAvatar user={data?.me}>
+		<UserAvatar user={data?.me?.userinfo}>
 			{#snippet menu()}
-				<a href="/logout">Logout</a>
+				<a href="/api/logout">Logout</a>
 			{/snippet}
 		</UserAvatar>
 	{/snippet}

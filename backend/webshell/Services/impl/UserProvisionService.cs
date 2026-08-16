@@ -1,6 +1,5 @@
 using System.Security.Claims;
-using backend.Data;
-using Microsoft.AspNetCore.Authentication;
+using appcore.Data;
 using Microsoft.EntityFrameworkCore;
 
 namespace backend.Services

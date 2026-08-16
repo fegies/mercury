@@ -12,7 +12,7 @@ backend/.env
 
 result
 
-backend/obj
-backend/bin
+backend/**/obj
+backend/**/bin
 
 **/core.*

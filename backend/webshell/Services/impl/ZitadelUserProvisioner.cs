@@ -1,8 +1,8 @@
 using System.Security.Claims;
 using System.Text.Json;
 using System.Text.Json.Nodes;
-using backend.Data;
-using backend.Entities;
+using appcore.Data;
+using appcore.Entities;
 
 namespace backend.Services;
 

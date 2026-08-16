@@ -1,10 +1,8 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Reflection;
 using System.Text;
-using System.Text.Json;
 using backend.Auth;
 using backend.Configuration;
-using backend.Data;
 using backend.Errors;
 using backend.Services;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -12,6 +10,9 @@ using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
+
+using appcore;
+using appcore.Data;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -21,6 +22,8 @@ var config = new BackendConfig();
 builder.Configuration.Bind(config);
 if (IsRealLaunch)
     config.Validate();
+
+builder.RegisterAppcoreServices();
 
 builder.Services.AddSingleton(config);
 builder.Services.AddScoped<UserProvisionService>();
@@ -34,8 +37,6 @@ switch (config.OidcConfig.ProviderType)
         builder.Services.AddScoped<IUserProvisioner, GeneriUserProvisioner>();
         break;
 }
-
-builder.Services.AddDbContext<ApplicationDbContext>(options => options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
 builder.Services.AddAuthentication(options =>
 {

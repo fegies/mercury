@@ -1,7 +1,7 @@
 using System.ComponentModel.DataAnnotations.Schema;
 using Microsoft.EntityFrameworkCore;
 
-namespace backend.Entities;
+namespace appcore.Entities;
 
 /// <summary>
 /// The user entity

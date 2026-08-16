@@ -6,6 +6,11 @@ Self-hosted auction platform for organization-internal auctions. SvelteKit front
 
 **Read `docs/ARCHITECTURE.md` first** for detailed architecture, routing, and data model.
 
+## Important Rules
+
+- **Always create a PR** for any changes made to the codebase. Commit, push to a feature branch, and open a pull request.
+- **Always sync from upstream** before starting work. Run `git fetch upstream && git merge upstream/main` on your branch to stay up to date.
+
 ## Commands
 
 ### Frontend (`frontend/`)
@@ -24,6 +29,7 @@ npm run openapi-ts   # Regenerate API client from backend OpenAPI spec
 ```bash
 dotnet build                              # Build solution
 dotnet run --project webshell             # Run backend (port 5023)
+dotnet test                               # Run all tests
 dotnet ef database update                 # Apply EF migrations
 dotnet ef migrations add <Name>           # Add new migration (in appcore dir)
 dotnet tool run openapi spec --output openapi/backend.json  # Export OpenAPI spec
@@ -104,13 +110,13 @@ nix develop     # Enter dev shell
 | Domain entities | `backend/appcore/Entities/` |
 | EF migrations | `backend/appcore/Migrations/` |
 | Event sourcing infra | `backend/appcore/Infra/` |
+| Tests | `backend/appcore.Tests/` |
 | Config model | `backend/webshell/Configuration/` |
 | Auth/authorization | `backend/webshell/Auth/` |
 | Nix packaging | `nix/` |
 
 ## Known Issues / WIP
 
-- `appcore.immutable` is a stub — do not reference its types
 - Old API classes (`AdminApi`, `UserApi`) were removed; use generated `BackendClient` instead
 - `frontend/src/lib/types/users.ts` — `User` type is missing `export` keyword
 - `default_auction()` in `types/auction.ts` has a bug: `new Date(new Date().getDate() + ...)` should be `new Date().getTime() + ...`

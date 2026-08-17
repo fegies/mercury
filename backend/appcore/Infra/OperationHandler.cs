@@ -56,7 +56,7 @@ internal class ContextInconsistentException() : Exception
 
 public interface EventEvaluator<TEvent, TResult>
 {
-    public TResult EvaluateEventWithContext(TEvent input, IContextProvider provider, out List<StoredEvent> generated_events, CancellationToken ct);
+    public Task<TResult> EvaluateEventWithContext(TEvent input, IContextProvider provider, out List<StoredEvent> generated_events, CancellationToken ct);
 }
 
 internal class IncomingEventHandler<TEvent, TResult>(DbEventStore provider, EventEvaluator<TEvent, TResult> evaluator)
@@ -69,18 +69,17 @@ internal class IncomingEventHandler<TEvent, TResult>(DbEventStore provider, Even
             {
                 ct.ThrowIfCancellationRequested();
                 await TryExecuteAndPersist(input, ct);
+                return;
             }
             catch (NpgsqlException ex)
             {
             }
         }
-
-
     }
 
     private async Task<TResult> TryExecuteAndPersist(TEvent input, CancellationToken ct)
     {
-        var res = evaluator.EvaluateEventWithContext(input, provider, out var generated_events, ct);
+        var res = await evaluator.EvaluateEventWithContext(input, provider, out var generated_events, ct);
 
         if (generated_events.Count > 0)
         {

@@ -20,7 +20,6 @@ Self-hosted auction platform for organization-internal auctions. Users browse an
 |---|---|
 | `backend/webshell/` | ASP.NET host — controllers, auth, services |
 | `backend/appcore/` | Domain — entities, DbContext, migrations, infra |
-| `backend/appcore.immutable/` | Immutable event types (stub, early stage) |
 | `frontend/src/lib/` | Shared code — API client, components, types |
 | `frontend/src/routes/` | SvelteKit file-based routing |
 | `nix/` | Nix packaging |
@@ -33,7 +32,6 @@ Self-hosted auction platform for organization-internal auctions. Users browse an
 |---|---|---|
 | `webshell` | Web SDK | HTTP layer — controllers, OIDC auth, service registration |
 | `appcore` | Class Library | Domain entities, EF DbContext, migrations, event-sourcing infra |
-| `appcore.immutable` | Class Library | Pure immutable event types and handler interface (WIP) |
 
 ### Bootstrap (`Program.cs`)
 
@@ -78,7 +76,7 @@ Startup sequence:
 - `IncomingEventHandler` — Retry loop with serializable transactions, consistency checks
 - `ContextInconsistentException` — Thrown on concurrent modification conflicts
 
-**Note:** The immutable event layer (`appcore.immutable`) is a stub and not yet integrated.
+**Note:** Event types live in `appcore.Entities.Events`.
 
 ### Configuration
 
@@ -214,9 +212,7 @@ dotnet ef database update         # Apply migrations
 ## Current State
 
 **Active early development.** Known gaps:
-- `appcore.immutable` is a stub (undefined types `Decision`, `Event`)
 - Old API classes (`AdminApi`, `UserApi`, `OAuthApi`) referenced but removed — migration to generated client in progress
-- Auction/bids/images tables not managed via EF (raw SQL in frontend)
 - Liveticker SSE is a demo prototype
 - Admin panel uses separate cookie-based auth (not OIDC)
 - `nix/backend_package.nix` references `rustPlatform` — leftover from previous Rust backend

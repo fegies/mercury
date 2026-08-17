@@ -77,7 +77,7 @@ builder.Services.ConfigureHttpJsonOptions(options =>
 builder.Services.AddControllers();
 
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
-builder.Services.AddOpenApi(options =>
+builder.Services.AddOpenApi("backend", options =>
 {
     options.ShouldInclude = (_) => true;
 });

@@ -1,7 +1,7 @@
 import { defineConfig } from '@hey-api/openapi-ts';
 
 export default defineConfig({
-    input: '../backend/openapi/backend.json',
+    input: '../backend/webshell/openapi/webshell_backend.json',
     output: {
         path: 'src/lib/client',
         entryFile: false,

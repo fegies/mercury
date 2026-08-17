@@ -10,6 +10,7 @@ Self-hosted auction platform for organization-internal auctions. SvelteKit front
 
 - **Always create a PR** for any changes made to the codebase. Commit, push to a feature branch, and open a pull request.
 - **Always sync from upstream** before starting work. Run `git fetch upstream && git merge upstream/main` on your branch to stay up to date.
+- **No warnings before you are done.** `dotnet build` and `dotnet test` must produce zero warnings. Frontend `npm run check` must produce zero new errors. Fix or suppress all warnings before considering work complete.
 
 ## Commands
 
@@ -122,3 +123,4 @@ nix develop     # Enter dev shell
 - `default_auction()` in `types/auction.ts` has a bug: `new Date(new Date().getDate() + ...)` should be `new Date().getTime() + ...`
 - Auction/bids/images tables are not EF-managed; schema is only in frontend raw SQL
 - `nix/backend_package.nix` references Rust tooling — stale/ignore
+- **OpenAPI spec generation:** The `Microsoft.Extensions.ApiDescription.Server` build-time target generates `webshell/openapi/backend.json`, but it may not pick up newly added controllers. After adding a new controller, run `dotnet clean && dotnet build` to force regeneration. If that still doesn't work, start the server and curl `/openapi/v1.json`.

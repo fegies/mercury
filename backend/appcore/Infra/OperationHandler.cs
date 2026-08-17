@@ -1,96 +1,141 @@
-using System.Linq;
-using System.Linq.Expressions;
+using System.Text.Json;
 using appcore.Data;
 using appcore.Entities;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
+using NpgsqlTypes;
 
 namespace appcore.Infra;
 
 public interface IContextProvider
 {
-    public Task<List<T>> QueryEvents<T>(Expression<Func<T, bool>> selector)
-        where T : StoredEvent;
+	Task<List<AppEvent>> QueryEvents(string? eventType = null);
+	Task AssertConsistency();
 }
 
-internal class DbEventStore(ApplicationDbContext _context) : IContextProvider
+public class DbEventStore : IContextProvider
 {
-    internal readonly ApplicationDbContext Context = _context;
+	internal readonly NpgsqlConnection Connection;
+	private long _max_observed_sequenceid = long.MinValue;
 
-    private readonly List<IQueryable<long>> _referenced_events = [];
-    private long _max_observed_sequenceid = long.MinValue;
+	public DbEventStore(ApplicationDbContext context)
+	{
+		Connection = context.Database.GetDbConnection() as NpgsqlConnection
+			?? throw new InvalidOperationException("Expected NpgsqlConnection");
+	}
 
-    public async Task<List<T>> QueryEvents<T>(Expression<Func<T, bool>> selector) where T : StoredEvent
-    {
-        var dbset = _context.Set<T>();
+	public async Task<List<AppEvent>> QueryEvents(string? eventType = null)
+	{
+		await using var cmd = Connection.CreateCommand();
+		if (eventType is not null)
+		{
+			cmd.CommandText = """
+				SELECT sequence_id, insertion_time, event_type, payload
+				FROM auction_events
+				WHERE event_type = @type
+				ORDER BY sequence_id
+				""";
+			cmd.Parameters.Add(new NpgsqlParameter("type", NpgsqlDbType.Text) { Value = eventType });
+		}
+		else
+		{
+			cmd.CommandText = """
+				SELECT sequence_id, insertion_time, event_type, payload
+				FROM auction_events
+				ORDER BY sequence_id
+				""";
+		}
 
-        var res_set = dbset.Where(selector);
+		var rows = new List<AppEvent>();
+		await using var reader = await cmd.ExecuteReaderAsync();
+		while (await reader.ReadAsync())
+		{
+			rows.Add(new AppEvent
+			{
+				SequenceId = reader.GetInt64(0),
+				InsertionTime = reader.GetDateTime(1),
+				EventType = reader.GetString(2),
+				Payload = JsonDocument.Parse(reader.GetString(3)),
+			});
+		}
 
-        _referenced_events.Add(res_set.Select(e => e.SequenceId));
+		if (rows.Count > 0)
+		{
+			var m = rows.Max(r => r.SequenceId);
+			if (m > _max_observed_sequenceid)
+				_max_observed_sequenceid = m;
+		}
 
-        var res = await res_set.ToListAsync();
-        var m = res.Max(e => e.SequenceId);
-        if (m > _max_observed_sequenceid)
-            _max_observed_sequenceid = m;
+		return rows;
+	}
 
-        return res;
-    }
+	public async Task AssertConsistency()
+	{
+		await using var cmd = Connection.CreateCommand();
+		cmd.CommandText = "SELECT COALESCE(MAX(sequence_id), 0) FROM auction_events";
+		var result = await cmd.ExecuteScalarAsync();
+		var currentMax = (long)(result ?? 0);
 
-    internal async Task AssertContextIsStillConsistent()
-    {
-        if (_referenced_events.Count == 0)
-            return;
-
-        var res_q = _referenced_events.Aggregate((l, r) => l.Union(r));
-        var checked_max = await res_q.MaxAsync();
-
-        if (checked_max > _max_observed_sequenceid)
-            throw new ContextInconsistentException();
-    }
+		if (currentMax > _max_observed_sequenceid)
+			throw new ContextInconsistentException();
+	}
 }
 
-internal class ContextInconsistentException() : Exception
-{
+public class ContextInconsistentException() : Exception { }
 
-}
+public record EvaluatorResult<TResult>(TResult Value, List<StoredEvent> GeneratedEvents);
 
 public interface EventEvaluator<TEvent, TResult>
 {
-    public Task<TResult> EvaluateEventWithContext(TEvent input, IContextProvider provider, out List<StoredEvent> generated_events, CancellationToken ct);
+	public Task<EvaluatorResult<TResult>> EvaluateEventWithContext(TEvent input, CancellationToken ct);
 }
 
-internal class IncomingEventHandler<TEvent, TResult>(DbEventStore provider, EventEvaluator<TEvent, TResult> evaluator)
+public class IncomingEventHandler<TEvent, TResult>(DbEventStore store, EventEvaluator<TEvent, TResult> evaluator)
 {
-    public async Task Execute(TEvent input, CancellationToken ct)
-    {
-        while (true)
-        {
-            try
-            {
-                ct.ThrowIfCancellationRequested();
-                await TryExecuteAndPersist(input, ct);
-                return;
-            }
-            catch (NpgsqlException ex)
-            {
-            }
-        }
-    }
+	public async Task Execute(TEvent input, CancellationToken ct)
+	{
+		const int maxRetries = 10;
+		for (var attempt = 0; attempt < maxRetries; attempt++)
+		{
+			try
+			{
+				ct.ThrowIfCancellationRequested();
+				await TryExecuteAndPersist(input, ct);
+				return;
+			}
+			catch (NpgsqlException) when (attempt < maxRetries - 1)
+			{
+				await Task.Delay(TimeSpan.FromMilliseconds(Math.Pow(2, attempt)), ct);
+			}
+		}
+	}
 
-    private async Task<TResult> TryExecuteAndPersist(TEvent input, CancellationToken ct)
-    {
-        var res = await evaluator.EvaluateEventWithContext(input, provider, out var generated_events, ct);
+	private async Task<TResult> TryExecuteAndPersist(TEvent input, CancellationToken ct)
+	{
+		var result = await evaluator.EvaluateEventWithContext(input, ct);
 
-        if (generated_events.Count > 0)
-        {
-            var ctx = provider.Context;
-            using var trans = ctx.Database.BeginTransaction(System.Data.IsolationLevel.Serializable);
-            await provider.AssertContextIsStillConsistent();
-            ctx.AddRange(generated_events);
-            await ctx.SaveChangesAsync(ct);
+		if (result.GeneratedEvents.Count > 0)
+		{
+			await store.Connection.OpenAsync(ct);
+			using var trans = await store.Connection.BeginTransactionAsync(System.Data.IsolationLevel.Serializable, ct);
+			await store.AssertConsistency();
 
-            trans.Commit();
-        }
-        return res;
-    }
+			foreach (var domainEvent in result.GeneratedEvents)
+			{
+				var row = EventSerializer.Serialize(domainEvent);
+				await using var cmd = store.Connection.CreateCommand();
+				cmd.CommandText = """
+					INSERT INTO auction_events (insertion_time, event_type, payload)
+					VALUES (@insertion_time, @event_type, @payload::jsonb)
+					""";
+				cmd.Parameters.Add(new NpgsqlParameter("insertion_time", NpgsqlDbType.TimestampTz) { Value = row.InsertionTime });
+				cmd.Parameters.Add(new NpgsqlParameter("event_type", NpgsqlDbType.Text) { Value = row.EventType });
+				cmd.Parameters.Add(new NpgsqlParameter("payload", NpgsqlDbType.Jsonb) { Value = row.Payload.RootElement.GetRawText() });
+				await cmd.ExecuteNonQueryAsync(ct);
+			}
+
+			await trans.CommitAsync(ct);
+		}
+		return result.Value;
+	}
 }

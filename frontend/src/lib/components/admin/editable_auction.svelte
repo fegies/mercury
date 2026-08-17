@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { DetailedAuction } from '$lib/types/auction';
+	import type { AuctionSummary } from '$lib/types/auction';
 	import { FileUpload } from '@skeletonlabs/skeleton-svelte';
 
 	import IconDropzone from '@lucide/svelte/icons/image-plus';
@@ -9,14 +9,14 @@
 	let {
 		model = $bindable()
 	}: {
-		model: DetailedAuction;
+		model: AuctionSummary;
 	} = $props();
 </script>
 
 <form method="POST" class="flex flex-col gap-4" enctype="multipart/form-data">
 	<label class="label">
 		<span class="label-text">Name</span>
-		<input class="input" type="text" name="name" value={model.name} />
+		<input class="input" type="text" name="name" value={model.title} />
 	</label>
 
 	<label class="label">
@@ -41,7 +41,7 @@
 			class="input"
 			name="min-price"
 			min="0"
-			value={model.min_price}
+			value={model.minimumPrice}
 		/>
 	</label>
 
@@ -51,8 +51,8 @@
 			type="datetime-local"
 			class="input"
 			name="auction-end"
-			min={new Date().toLocaleString()}
-			value={model.auction_end.toLocaleString()}
+			min={new Date().toISOString().slice(0, 16)}
+			value={new Date(model.closureTime).toISOString().slice(0, 16)}
 		/>
 	</label>
 

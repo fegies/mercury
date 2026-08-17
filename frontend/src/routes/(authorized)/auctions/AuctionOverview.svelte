@@ -1,40 +1,22 @@
 <script lang="ts">
 	import DateCountdownBadge from '$lib/components/common/DateCountdownBadge.svelte';
+	import type { AuctionSummary } from '$lib/types/auction.js';
 
 	import IconImage from '@lucide/svelte/icons/image-off';
-	import { onMount } from 'svelte';
 
 	let {
 		auction
 	}: {
-		auction: {
-			first_image: string | null;
-			item_name: string;
-			current_value: number;
-			end_time: Date;
-			id: string;
-		};
+		auction: AuctionSummary;
 	} = $props();
 
-	let current_value = $state(auction.current_value);
-
-	onMount(async () => {
-		const resp = await fetch(`/auctions/${auction.id}/liveticker`);
-		if (resp.body) {
-			const reader = resp.body.pipeThrough(new TextDecoderStream()).getReader();
-			while (true) {
-				const { done, value } = await reader.read();
-				console.log(done, value);
-				if (done) break;
-			}
-		}
-	});
+	let current_bid = $state(auction.currentBid);
 </script>
 
 <div class="flex h-64 w-64 justify-center">
-	{#if auction.first_image}
+	{#if auction.imageUrls.length > 0}
 		<img
-			src={auction.first_image}
+			src={auction.imageUrls[0]}
 			alt="Auction item"
 			class="bg-surface-800 rounded-container h-full w-full object-contain"
 		/>
@@ -43,10 +25,10 @@
 	{/if}
 </div>
 <div class="my-5 flex flex-col">
-	<span class="h3">{auction.item_name}</span>
-	<span>{current_value}€</span>
+	<span class="h3">{auction.title}</span>
+	<span>{current_bid ?? auction.minimumPrice}€</span>
 	<span
-		>Ends {auction.end_time.toLocaleString()} (<DateCountdownBadge expiryDate={auction.end_time}
+		>Ends {new Date(auction.closureTime).toLocaleString()} (<DateCountdownBadge expiryDate={new Date(auction.closureTime)}
 		></DateCountdownBadge>)</span
 	>
 </div>

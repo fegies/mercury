@@ -1,4 +1,5 @@
 using appcore.Data;
+using appcore.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -11,5 +12,6 @@ public static class StartupExtension
     public static void RegisterAppcoreServices(this IHostApplicationBuilder builder)
     {
         builder.Services.AddDbContext<ApplicationDbContext>(options => options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+        builder.Services.AddScoped<AuctionService>();
     }
 }

@@ -1,5 +1,5 @@
 using System.Security.Claims;
-using backend.Entities;
+using appcore.Entities;
 
 namespace backend.Services;
 

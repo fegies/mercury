@@ -140,6 +140,11 @@ The locks exist solely to stop two concurrent appends from both passing the exis
 
 A `ConcurrencyConflictException` restarts the entire pipeline — the decision is re-run against a freshly loaded context. This is what provides sequential consistency: concurrent operations may interleave arbitrarily, but every committed outcome is the result of a decision made against a context that was still current at commit time, and retries converge to the order in which the appends actually committed.
 
+## Notes
+
+- **Dimension matching is textual.** Scope predicates compare `payload->>'prop' = @value` as text. Guid/string values compare exactly; numeric values depend on serialization (e.g. `10.00m` serializes as `"10.00"`). Constrain numeric dimensions with care — use consistently formatted values or prefer string-typed dimensions.
+- **Lock keys are stable hashes.** `(property, value)` pairs are hashed with SHA1 (first 8 bytes) to the `bigint` advisory-lock key; collisions only cause extra serialization, never incorrectness.
+
 ## Test strategy
 
 An in-memory `IEventStore` mirroring the append semantics (conflict detection, sequence-id assignment, payload validation) provides deterministic test doubles. Concurrency conflicts are injected directly rather than simulated through threads, so the retry loop is exercised without flakiness.

@@ -1,6 +1,5 @@
 using System.Globalization;
 using System.Security.Cryptography;
-using appcore.Data;
 using appcore.Entities;
 using appcore.Entities.Events;
 using appcore.Infra;
@@ -14,7 +13,7 @@ namespace backend.Controllers;
 
 [Route("api/auctions")]
 [ApiController]
-public class AuctionController(AuctionService auctionService, ApplicationDbContext ctx) : ControllerBase
+public class AuctionController(AuctionService auctionService, IEventStore eventStore) : ControllerBase
 {
     private const string AuctionImagesBasePath = "data/auctions";
 
@@ -79,8 +78,7 @@ public class AuctionController(AuctionService auctionService, ApplicationDbConte
             ClosureTime = request.ClosureTime,
         };
 
-        var store = new DbEventStore(ctx);
-        var handler = new IncomingEventHandler<AuctionCreated, Guid>(store, new CreateAuctionEvaluator(), new EventHandlerOptions());
+        var handler = new IncomingEventHandler<AuctionCreated, Guid>(eventStore, new CreateAuctionEvaluator(), new EventHandlerOptions());
 
         try
         {
@@ -112,8 +110,7 @@ public class AuctionController(AuctionService auctionService, ApplicationDbConte
             ClosureTime = request.ClosureTime,
         };
 
-        var store = new DbEventStore(ctx);
-        var handler = new IncomingEventHandler<AuctionUpdated, bool>(store, new UpdateAuctionEvaluator(), new EventHandlerOptions());
+        var handler = new IncomingEventHandler<AuctionUpdated, bool>(eventStore, new UpdateAuctionEvaluator(), new EventHandlerOptions());
 
         try
         {
@@ -149,8 +146,7 @@ public class AuctionController(AuctionService auctionService, ApplicationDbConte
             ImageIds = [imageId],
         };
 
-        var store = new DbEventStore(ctx);
-        var handler = new IncomingEventHandler<AuctionImagesRemoved, bool>(store, new RemoveImagesEvaluator(), new EventHandlerOptions());
+        var handler = new IncomingEventHandler<AuctionImagesRemoved, bool>(eventStore, new RemoveImagesEvaluator(), new EventHandlerOptions());
 
         try
         {
@@ -178,8 +174,7 @@ public class AuctionController(AuctionService auctionService, ApplicationDbConte
             Reason = AuctionCloseReason.Manual,
         };
 
-        var store = new DbEventStore(ctx);
-        var handler = new IncomingEventHandler<AuctionClosed, bool>(store, new CloseAuctionEvaluator(), new EventHandlerOptions());
+        var handler = new IncomingEventHandler<AuctionClosed, bool>(eventStore, new CloseAuctionEvaluator(), new EventHandlerOptions());
 
         try
         {
@@ -259,8 +254,7 @@ public class AuctionController(AuctionService auctionService, ApplicationDbConte
             Images = imageRefs,
         };
 
-        var store = new DbEventStore(ctx);
-        var handler = new IncomingEventHandler<AuctionImagesAdded, bool>(store, new AddImagesEvaluator(), new EventHandlerOptions());
+        var handler = new IncomingEventHandler<AuctionImagesAdded, bool>(eventStore, new AddImagesEvaluator(), new EventHandlerOptions());
 
         try
         {

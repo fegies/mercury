@@ -1,6 +1,5 @@
 using System.Globalization;
 using System.Security.Cryptography;
-using appcore.Data;
 using appcore.Entities;
 using appcore.Entities.Events;
 using appcore.Infra;
@@ -14,7 +13,13 @@ namespace backend.Controllers;
 
 [Route("api/auctions")]
 [ApiController]
-public class AuctionController(AuctionService auctionService, ApplicationDbContext ctx) : ControllerBase
+public class AuctionController(
+    AuctionService auctionService,
+    IncomingEventHandler<AuctionCreated, Guid> createAuctionHandler,
+    IncomingEventHandler<AuctionUpdated, bool> updateAuctionHandler,
+    IncomingEventHandler<AuctionImagesRemoved, bool> removeImagesHandler,
+    IncomingEventHandler<AuctionClosed, bool> closeAuctionHandler,
+    IncomingEventHandler<AuctionImagesAdded, bool> addImagesHandler) : ControllerBase
 {
     private const string AuctionImagesBasePath = "data/auctions";
 
@@ -79,12 +84,9 @@ public class AuctionController(AuctionService auctionService, ApplicationDbConte
             ClosureTime = request.ClosureTime,
         };
 
-        var store = new DbEventStore(ctx);
-        var handler = new IncomingEventHandler<AuctionCreated, Guid>(store, new CreateAuctionEvaluator(auctionService));
-
         try
         {
-            await handler.Execute(createdEvent, ct);
+            await createAuctionHandler.Execute(createdEvent, ct);
         }
         catch (InvariantViolation ex)
         {
@@ -112,12 +114,9 @@ public class AuctionController(AuctionService auctionService, ApplicationDbConte
             ClosureTime = request.ClosureTime,
         };
 
-        var store = new DbEventStore(ctx);
-        var handler = new IncomingEventHandler<AuctionUpdated, bool>(store, new UpdateAuctionEvaluator(auctionService));
-
         try
         {
-            await handler.Execute(updatedEvent, ct);
+            await updateAuctionHandler.Execute(updatedEvent, ct);
         }
         catch (InvariantViolation ex)
         {
@@ -149,12 +148,9 @@ public class AuctionController(AuctionService auctionService, ApplicationDbConte
             ImageIds = [imageId],
         };
 
-        var store = new DbEventStore(ctx);
-        var handler = new IncomingEventHandler<AuctionImagesRemoved, bool>(store, new RemoveImagesEvaluator(auctionService));
-
         try
         {
-            await handler.Execute(removedEvent, ct);
+            await removeImagesHandler.Execute(removedEvent, ct);
         }
         catch (InvariantViolation ex)
         {
@@ -178,12 +174,9 @@ public class AuctionController(AuctionService auctionService, ApplicationDbConte
             Reason = AuctionCloseReason.Manual,
         };
 
-        var store = new DbEventStore(ctx);
-        var handler = new IncomingEventHandler<AuctionClosed, bool>(store, new CloseAuctionEvaluator(auctionService));
-
         try
         {
-            await handler.Execute(closedEvent, ct);
+            await closeAuctionHandler.Execute(closedEvent, ct);
         }
         catch (InvariantViolation ex)
         {
@@ -259,12 +252,9 @@ public class AuctionController(AuctionService auctionService, ApplicationDbConte
             Images = imageRefs,
         };
 
-        var store = new DbEventStore(ctx);
-        var handler = new IncomingEventHandler<AuctionImagesAdded, bool>(store, new AddImagesEvaluator(auctionService));
-
         try
         {
-            await handler.Execute(addedEvent, ct);
+            await addImagesHandler.Execute(addedEvent, ct);
         }
         catch (InvariantViolation ex)
         {

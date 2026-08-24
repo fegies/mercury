@@ -5,10 +5,9 @@ This document describes the event-sourced backend of Project Mercury: a self-hos
 ## Design Principles
 
 - **Append-only event log.** Events are never deleted or mutated once persisted. The system state at any point in time is derived by replaying events.
-- **One table per event type.** Each event type maps to its own PostgreSQL table, keeping schemas narrow and queryable.
-- **Single shared sequence.** All event tables draw their `event_id` from a single PostgreSQL sequence (`event_id_seq`). This provides a global ordering across all event types.
-- **Optimistic concurrency.** Every event inherits `SequenceId` from `StoredEvent`. Before committing a batch of new events, the system verifies that no referenced events have advanced past the `SequenceId` observed during the read phase. Conflicts raise `ContextInconsistentException` and the operation is retried.
-- **State reconstruction.** Aggregate state is reconstructed on demand by replaying the relevant event stream for a given entity.
+- **Single event table.** All events live in `auction_events` with a shared global `sequence_id`. This provides a global ordering across all event types.
+- **Dynamic Consistency Boundary (DCB).** Write operations do not target fixed aggregates. Each command declares its own consistency boundary — a query over event types and payload properties — and the result is committed only if that boundary is unchanged since the decision's context was loaded. Conflicts are retried with fresh context (sequential consistency by retry). See [Dynamic Consistency Boundary](dynamic-consistency-boundary.md).
+- **State reconstruction.** Aggregate state is reconstructed on demand by replaying the events selected by a scoped query for a given entity.
 
 ## StoredEvent Base Class
 
@@ -38,13 +37,19 @@ All domain events extend `StoredEvent`:
 
 ## Concurrency Model
 
-The `DbEventStore` tracks the maximum `SequenceId` observed across all queries issued during a single operation. When the operation completes, it asserts that this maximum has not been exceeded by any intervening write. If it has, the entire operation is retried inside a serializable transaction.
+Write operations use a **Dynamic Consistency Boundary** (see [the full scheme](dynamic-consistency-boundary.md)):
+
+- Information gathering is lock-free and declarative: the decision function returns an initial `EventSelector` (event types + payload constraints), the handler reads the context, and the decision may request a wider scope, which triggers a full reload.
+- The commit is guarded by a `ConsistencyBoundary` (the accumulated selectors plus `LastPosition` — the global `MAX(sequence_id)` at the last reload).
+- Appends run in a short READ COMMITTED transaction. Transaction-scoped advisory locks derived from the payload dimensions the operation reads and writes (acquired in sorted order) prevent write skew. The scope predicate is re-evaluated at insert time; a matched event with `sequence_id > LastPosition` raises `ConcurrencyConflictException`.
+- On conflict the entire pipeline is retried with a freshly loaded context. `InvariantViolation` failures abort immediately and are never retried.
 
 ```
-Read phase:   observe SequenceId = N from queried events
-Write phase:  assert max(SequenceId across referenced tables) == N
-              if not → ContextInconsistentException → retry
-              if yes → insert new events → commit
+Gather phase:  read boundary = DNF of selectors, observe LastPosition = MAX(sequence_id)
+Decide phase:  pure decision over the snapshot; may widen scope → full reload
+Commit phase:  advisory locks on (property, value) keys → re-check scope at insert
+               if stale → ConcurrencyConflictException → retry from Gather
+               if clean → insert events → commit
 ```
 
 ## Further Reading

@@ -69,12 +69,12 @@ Startup sequence:
 - `StoredEvent` — Abstract base for event sourcing (SequenceId, InsertionTime)
 - `AuctionCreated` — Event: AuctionId, Title, ClosureTime
 
-**Event Sourcing Infrastructure** (`OperationHandler.cs`):
-- `IContextProvider` — Queries stored events for a given type
-- `EventEvaluator<TEvent, TResult>` — Processes an event and produces new events
-- `DbEventStore` — Queries events, tracks sequence IDs for optimistic concurrency
-- `IncomingEventHandler` — Retry loop with serializable transactions, consistency checks
-- `ContextInconsistentException` — Thrown on concurrent modification conflicts
+**Event Sourcing Infrastructure** — [Dynamic Consistency Boundary](events/dynamic-consistency-boundary.md):
+- `OperationHandler.cs` — DCB query language and orchestrator: `EventSelector`/`ConsistencyBoundary`, `IDecisionFunction`/`DecisionStep`, `IncomingEventHandler`
+- `EventStore.cs` — Contracts: `EventContext`, `IEventReader`, `IEventStore`, `ConcurrencyConflictException`
+- `DbEventStore.cs` — PostgreSQL-backed implementation: conditional append under READ COMMITTED with advisory locks derived from payload dimensions; re-checks the scope at insert time
+- `IncomingEventHandler` — Orchestrates gather → decide → append, retrying the whole pipeline on `ConcurrencyConflictException`
+- Handlers, evaluators, and event stores are registered in DI and injected into controllers (controllers never construct them manually)
 
 **Note:** Event types live in `appcore.Entities.Events`.
 
@@ -107,9 +107,9 @@ Custom `WebStatusException` hierarchy (extends `Exception`):
 - `Users` — Id (uuid PK), OidIss, OidSub, Name, Email, ProfilePictureUrl
 
 **Event sourcing:**
-- Every event type has its own table
+- Single `auction_events` table; every event row carries a global `sequence_id` from one shared PostgreSQL sequence
 - Events are never deleted
-- Every event table uses the `event_id` column via a single shared PostgreSQL sequence, explicitly configured in the migration builder
+- Scoped reads and the append consistency check predicate over `event_type` and `payload` JSON properties; expression indexes can be added per hot path
 
 ## Frontend Architecture
 

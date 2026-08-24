@@ -1,26 +1,25 @@
 using appcore.Entities;
-using appcore.Entities.Events;
 using appcore.Infra;
 using appcore.Infra.Evaluators;
 
 namespace appcore.Services;
 
-public class AuctionService(IContextProvider provider)
+public class AuctionService(IEventReader reader)
 {
 	public async Task<AuctionState> GetAuctionState(Guid auctionId)
 	{
-		var rows = await provider.QueryEvents();
-		return rows
-			.Where(r => r.Payload.RootElement.TryGetProperty("auctionId", out var prop)
-					 && prop.GetString() == auctionId.ToString())
-			.Select(EventSerializer.Deserialize)
-			.Aggregate(AuctionState.Empty, AuctionState.Incorporate);
+		var context = await reader.Read(
+			[EventSelector.ForAuction(auctionId, EventTypeNames.Auction)],
+			CancellationToken.None);
+		return AuctionFold.State(context);
 	}
 
 	public async Task<List<Guid>> GetAllAuctionIds()
 	{
-		var rows = await provider.QueryEvents();
-		return rows
+		var context = await reader.Read(
+			[EventSelector.OfTypes(EventTypeNames.AuctionCreated)],
+			CancellationToken.None);
+		return context.Events
 			.Where(r => r.Payload.RootElement.TryGetProperty("auctionId", out _))
 			.Select(r => r.Payload.RootElement.GetProperty("auctionId").GetGuid())
 			.Distinct()

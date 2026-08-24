@@ -1,141 +1,106 @@
-using System.Text.Json;
-using appcore.Data;
 using appcore.Entities;
-using Microsoft.EntityFrameworkCore;
 using Npgsql;
-using NpgsqlTypes;
 
 namespace appcore.Infra;
 
-public interface IContextProvider
+public static class EventTypeNames
 {
-	Task<List<AppEvent>> QueryEvents(string? eventType = null);
-	Task AssertConsistency();
+	public const string AuctionCreated = nameof(Entities.Events.AuctionCreated);
+	public const string AuctionUpdated = nameof(Entities.Events.AuctionUpdated);
+	public const string AuctionImagesAdded = nameof(Entities.Events.AuctionImagesAdded);
+	public const string AuctionImagesRemoved = nameof(Entities.Events.AuctionImagesRemoved);
+	public const string AuctionClosed = nameof(Entities.Events.AuctionClosed);
+
+	public static readonly string[] Auction = [AuctionCreated, AuctionUpdated, AuctionImagesAdded, AuctionImagesRemoved, AuctionClosed];
 }
 
-public class DbEventStore : IContextProvider
+public sealed record DimensionConstraint(string Property, string Value);
+
+public sealed record EventSelector(
+	IReadOnlyCollection<string> EventTypes,
+	IReadOnlyCollection<DimensionConstraint> Constraints)
 {
-	internal readonly NpgsqlConnection Connection;
-	private long _max_observed_sequenceid = long.MinValue;
+	public static EventSelector ForAuction(Guid auctionId, params string[] eventTypes)
+		=> new(eventTypes, [new DimensionConstraint("auctionId", auctionId.ToString())]);
 
-	public DbEventStore(ApplicationDbContext context)
-	{
-		Connection = context.Database.GetDbConnection() as NpgsqlConnection
-			?? throw new InvalidOperationException("Expected NpgsqlConnection");
-	}
+	public static EventSelector ForUser(Guid userId, params string[] eventTypes)
+		=> new(eventTypes, [new DimensionConstraint("userId", userId.ToString())]);
 
-	public async Task<List<AppEvent>> QueryEvents(string? eventType = null)
-	{
-		await using var cmd = Connection.CreateCommand();
-		if (eventType is not null)
-		{
-			cmd.CommandText = """
-				SELECT sequence_id, insertion_time, event_type, payload
-				FROM auction_events
-				WHERE event_type = @type
-				ORDER BY sequence_id
-				""";
-			cmd.Parameters.Add(new NpgsqlParameter("type", NpgsqlDbType.Text) { Value = eventType });
-		}
-		else
-		{
-			cmd.CommandText = """
-				SELECT sequence_id, insertion_time, event_type, payload
-				FROM auction_events
-				ORDER BY sequence_id
-				""";
-		}
-
-		var rows = new List<AppEvent>();
-		await using var reader = await cmd.ExecuteReaderAsync();
-		while (await reader.ReadAsync())
-		{
-			rows.Add(new AppEvent
-			{
-				SequenceId = reader.GetInt64(0),
-				InsertionTime = reader.GetDateTime(1),
-				EventType = reader.GetString(2),
-				Payload = JsonDocument.Parse(reader.GetString(3)),
-			});
-		}
-
-		if (rows.Count > 0)
-		{
-			var m = rows.Max(r => r.SequenceId);
-			if (m > _max_observed_sequenceid)
-				_max_observed_sequenceid = m;
-		}
-
-		return rows;
-	}
-
-	public async Task AssertConsistency()
-	{
-		await using var cmd = Connection.CreateCommand();
-		cmd.CommandText = "SELECT COALESCE(MAX(sequence_id), 0) FROM auction_events";
-		var result = await cmd.ExecuteScalarAsync();
-		var currentMax = (long)(result ?? 0);
-
-		if (currentMax > _max_observed_sequenceid)
-			throw new ContextInconsistentException();
-	}
+	public static EventSelector OfTypes(params string[] eventTypes)
+		=> new(eventTypes, []);
 }
 
-public class ContextInconsistentException() : Exception { }
-
-public record EvaluatorResult<TResult>(TResult Value, List<StoredEvent> GeneratedEvents);
-
-public interface EventEvaluator<TEvent, TResult>
+public abstract record DecisionStep<TResult>
 {
-	public Task<EvaluatorResult<TResult>> EvaluateEventWithContext(TEvent input, CancellationToken ct);
+	public sealed record NeedMoreContext(EventSelector AdditionalSelector) : DecisionStep<TResult>;
+	public sealed record Complete(TResult Value, IReadOnlyList<StoredEvent> EventsToAppend) : DecisionStep<TResult>;
 }
 
-public class IncomingEventHandler<TEvent, TResult>(DbEventStore store, EventEvaluator<TEvent, TResult> evaluator)
+public interface IDecisionFunction<in TInput, TResult>
 {
-	public async Task Execute(TEvent input, CancellationToken ct)
+	EventSelector InitialSelector(TInput input);
+	DecisionStep<TResult> Step(TInput input, EventContext context);
+}
+
+public sealed record EventHandlerOptions
+{
+	public int MaxAttempts { get; init; } = 10;
+	public int MaxExpansions { get; init; } = 10;
+}
+
+public sealed class IncomingEventHandler<TInput, TResult>(
+	IEventStore store,
+	IDecisionFunction<TInput, TResult> decision,
+	EventHandlerOptions options)
+{
+	public async Task<TResult> Execute(TInput input, CancellationToken ct)
 	{
-		const int maxRetries = 10;
-		for (var attempt = 0; attempt < maxRetries; attempt++)
+		for (var attempt = 0; ; attempt++)
 		{
 			try
 			{
-				ct.ThrowIfCancellationRequested();
-				await TryExecuteAndPersist(input, ct);
-				return;
+				return await TryExecute(input, ct);
 			}
-			catch (NpgsqlException) when (attempt < maxRetries - 1)
+			catch (ConcurrencyConflictException ex)
 			{
+				if (attempt >= options.MaxAttempts - 1)
+					throw new InvalidOperationException("Event handler did not converge after repeated attempts.", ex);
+				await Task.Delay(TimeSpan.FromMilliseconds(Math.Pow(2, attempt)), ct);
+			}
+			catch (NpgsqlException ex) when (ex.IsTransient)
+			{
+				if (attempt >= options.MaxAttempts - 1)
+					throw new InvalidOperationException("Event handler did not converge after repeated attempts.", ex);
 				await Task.Delay(TimeSpan.FromMilliseconds(Math.Pow(2, attempt)), ct);
 			}
 		}
 	}
 
-	private async Task<TResult> TryExecuteAndPersist(TEvent input, CancellationToken ct)
+	private async Task<TResult> TryExecute(TInput input, CancellationToken ct)
 	{
-		var result = await evaluator.EvaluateEventWithContext(input, ct);
+		var reader = store.Reader;
+		var boundary = ConsistencyBoundary.StartWith(decision.InitialSelector(input), head: 0);
+		var context = await reader.Read(boundary.Selectors.ToArray(), ct);
+		boundary = boundary with { LastPosition = context.Head };
 
-		if (result.GeneratedEvents.Count > 0)
+		for (var expansion = 0; expansion < options.MaxExpansions; expansion++)
 		{
-			await store.Connection.OpenAsync(ct);
-			using var trans = await store.Connection.BeginTransactionAsync(System.Data.IsolationLevel.Serializable, ct);
-			await store.AssertConsistency();
+			ct.ThrowIfCancellationRequested();
 
-			foreach (var domainEvent in result.GeneratedEvents)
+			switch (decision.Step(input, context))
 			{
-				var row = EventSerializer.Serialize(domainEvent);
-				await using var cmd = store.Connection.CreateCommand();
-				cmd.CommandText = """
-					INSERT INTO auction_events (insertion_time, event_type, payload)
-					VALUES (@insertion_time, @event_type, @payload::jsonb)
-					""";
-				cmd.Parameters.Add(new NpgsqlParameter("insertion_time", NpgsqlDbType.TimestampTz) { Value = row.InsertionTime });
-				cmd.Parameters.Add(new NpgsqlParameter("event_type", NpgsqlDbType.Text) { Value = row.EventType });
-				cmd.Parameters.Add(new NpgsqlParameter("payload", NpgsqlDbType.Jsonb) { Value = row.Payload.RootElement.GetRawText() });
-				await cmd.ExecuteNonQueryAsync(ct);
-			}
+				case DecisionStep<TResult>.NeedMoreContext more:
+					boundary = boundary.Include(more.AdditionalSelector);
+					context = await reader.Read(boundary.Selectors.ToArray(), ct);
+					boundary = boundary with { LastPosition = context.Head };
+					continue;
 
-			await trans.CommitAsync(ct);
+				case DecisionStep<TResult>.Complete done:
+					await store.Append(done.EventsToAppend, boundary, ct);
+					return done.Value;
+			}
 		}
-		return result.Value;
+
+		throw new InvalidOperationException("Decision did not converge within the expansion limit.");
 	}
 }

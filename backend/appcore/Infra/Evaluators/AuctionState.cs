@@ -55,3 +55,9 @@ public record AuctionState(
 		Images: []
 	);
 }
+
+public static class AuctionFold
+{
+	public static AuctionState State(EventContext context)
+		=> context.Fold(AuctionState.Empty, AuctionState.Incorporate);
+}

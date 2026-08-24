@@ -1,8 +1,6 @@
-using appcore.Entities;
 using appcore.Entities.Events;
 using appcore.Infra;
 using appcore.Infra.Evaluators;
-using appcore.Services;
 using appcore.Tests.Infrastructure;
 using Xunit;
 
@@ -10,11 +8,6 @@ namespace appcore.Tests.Evaluators;
 
 public class CreateAuctionEvaluatorTests
 {
-	private static CreateAuctionEvaluator CreateEvaluator(AuctionService auctionService)
-	{
-		return new CreateAuctionEvaluator(auctionService);
-	}
-
 	private static AuctionCreated CreateValidAppEvent(Guid? auctionId = null) => new()
 	{
 		AuctionId = auctionId ?? Guid.NewGuid(),
@@ -25,92 +18,78 @@ public class CreateAuctionEvaluatorTests
 	};
 
 	[Fact]
-	public async Task Create_ValidAuction_ReturnsAuctionId()
+	public void Create_ValidAuction_ReturnsAuctionId()
 	{
 		var auctionId = Guid.NewGuid();
 		var input = CreateValidAppEvent(auctionId);
-		var provider = new InMemoryContextProvider([]);
-		var auctionService = new AuctionService(provider);
-		var evaluator = CreateEvaluator(auctionService);
+		var evaluator = new CreateAuctionEvaluator();
 
-		var result = await evaluator.EvaluateEventWithContext(input, CancellationToken.None);
+		var step = evaluator.Step(input, TestContext.From());
 
+		var result = Assert.IsType<DecisionStep<Guid>.Complete>(step);
 		Assert.Equal(auctionId, result.Value);
 	}
 
 	[Fact]
-	public async Task Create_EmptyTitle_ThrowsInvariantViolation()
+	public void Create_EmptyTitle_ThrowsInvariantViolation()
 	{
 		var input = CreateValidAppEvent();
 		input.Title = "";
-		var provider = new InMemoryContextProvider([]);
-		var auctionService = new AuctionService(provider);
-		var evaluator = CreateEvaluator(auctionService);
+		var evaluator = new CreateAuctionEvaluator();
 
-		var ex = await Assert.ThrowsAsync<InvariantViolation>(() =>
-			evaluator.EvaluateEventWithContext(input, CancellationToken.None));
+		var ex = Assert.Throws<InvariantViolation>(() => evaluator.Step(input, TestContext.From()));
 
 		Assert.Equal("Title must be non-empty.", ex.Message);
 	}
 
 	[Fact]
-	public async Task Create_NegativePrice_ThrowsInvariantViolation()
+	public void Create_NegativePrice_ThrowsInvariantViolation()
 	{
 		var input = CreateValidAppEvent();
 		input.MinimumPrice = -5m;
-		var provider = new InMemoryContextProvider([]);
-		var auctionService = new AuctionService(provider);
-		var evaluator = CreateEvaluator(auctionService);
+		var evaluator = new CreateAuctionEvaluator();
 
-		var ex = await Assert.ThrowsAsync<InvariantViolation>(() =>
-			evaluator.EvaluateEventWithContext(input, CancellationToken.None));
+		var ex = Assert.Throws<InvariantViolation>(() => evaluator.Step(input, TestContext.From()));
 
 		Assert.Equal("Minimum price must be non-negative.", ex.Message);
 	}
 
 	[Fact]
-	public async Task Create_PastClosureTime_ThrowsInvariantViolation()
+	public void Create_PastClosureTime_ThrowsInvariantViolation()
 	{
 		var input = CreateValidAppEvent();
 		input.ClosureTime = DateTime.UtcNow.AddDays(-1);
-		var provider = new InMemoryContextProvider([]);
-		var auctionService = new AuctionService(provider);
-		var evaluator = CreateEvaluator(auctionService);
+		var evaluator = new CreateAuctionEvaluator();
 
-		var ex = await Assert.ThrowsAsync<InvariantViolation>(() =>
-			evaluator.EvaluateEventWithContext(input, CancellationToken.None));
+		var ex = Assert.Throws<InvariantViolation>(() => evaluator.Step(input, TestContext.From()));
 
 		Assert.Equal("Closure time must be in the future.", ex.Message);
 	}
 
 	[Fact]
-	public async Task Create_DuplicateAuction_ThrowsInvariantViolation()
+	public void Create_DuplicateAuction_ThrowsInvariantViolation()
 	{
 		var auctionId = Guid.NewGuid();
 		var existing = CreateValidAppEvent(auctionId);
-
 		var duplicate = CreateValidAppEvent(auctionId);
-		var provider = new InMemoryContextProvider([EventSerializer.Serialize(existing)]);
-		var auctionService = new AuctionService(provider);
-		var evaluator = CreateEvaluator(auctionService);
+		var evaluator = new CreateAuctionEvaluator();
 
-		var ex = await Assert.ThrowsAsync<InvariantViolation>(() =>
-			evaluator.EvaluateEventWithContext(duplicate, CancellationToken.None));
+		var ex = Assert.Throws<InvariantViolation>(() =>
+			evaluator.Step(duplicate, TestContext.From(EventSerializer.Serialize(existing))));
 
 		Assert.Equal("An auction with this ID already exists.", ex.Message);
 	}
 
 	[Fact]
-	public async Task Create_EmitsCorrectEvent()
+	public void Create_EmitsCorrectEvent()
 	{
 		var input = CreateValidAppEvent();
-		var provider = new InMemoryContextProvider([]);
-		var auctionService = new AuctionService(provider);
-		var evaluator = CreateEvaluator(auctionService);
+		var evaluator = new CreateAuctionEvaluator();
 
-		var result = await evaluator.EvaluateEventWithContext(input, CancellationToken.None);
+		var step = evaluator.Step(input, TestContext.From());
 
-		Assert.Single(result.GeneratedEvents);
-		Assert.Same(input, result.GeneratedEvents[0]);
+		var result = Assert.IsType<DecisionStep<Guid>.Complete>(step);
+		Assert.Single(result.EventsToAppend);
+		Assert.Same(input, result.EventsToAppend[0]);
 	}
 }

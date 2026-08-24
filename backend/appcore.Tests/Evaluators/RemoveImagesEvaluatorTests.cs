@@ -1,8 +1,6 @@
-using appcore.Entities;
 using appcore.Entities.Events;
 using appcore.Infra;
 using appcore.Infra.Evaluators;
-using appcore.Services;
 using appcore.Tests.Infrastructure;
 using Xunit;
 
@@ -36,27 +34,26 @@ public class RemoveImagesEvaluatorTests
 	}
 
 	[Fact]
-	public async Task RemoveImages_OpenAuction_ReturnsTrue()
+	public void RemoveImages_OpenAuction_ReturnsTrue()
 	{
 		var auctionId = Guid.NewGuid();
 		var baseEvent = CreateBaseAppEvent(auctionId);
 		var (addedEvent, imageIds) = AddImagesToAuction(auctionId);
-		var provider = new InMemoryContextProvider([EventSerializer.Serialize(baseEvent), EventSerializer.Serialize(addedEvent)]);
-		var auctionService = new AuctionService(provider);
-		var evaluator = new RemoveImagesEvaluator(auctionService);
+		var evaluator = new RemoveImagesEvaluator();
 		var input = new AuctionImagesRemoved
 		{
 			AuctionId = auctionId,
 			ImageIds = [imageIds[0]]
 		};
 
-		var result = await evaluator.EvaluateEventWithContext(input, CancellationToken.None);
+		var step = evaluator.Step(input, TestContext.From(EventSerializer.Serialize(baseEvent), EventSerializer.Serialize(addedEvent)));
 
+		var result = Assert.IsType<DecisionStep<bool>.Complete>(step);
 		Assert.True(result.Value);
 	}
 
 	[Fact]
-	public async Task RemoveImages_ClosedAuction_ThrowsInvariantViolation()
+	public void RemoveImages_ClosedAuction_ThrowsInvariantViolation()
 	{
 		var auctionId = Guid.NewGuid();
 		var baseEvent = CreateBaseAppEvent(auctionId);
@@ -66,55 +63,51 @@ public class RemoveImagesEvaluatorTests
 			AuctionId = auctionId,
 			Reason = AuctionCloseReason.Manual
 		};
-		var provider = new InMemoryContextProvider([EventSerializer.Serialize(baseEvent), EventSerializer.Serialize(addedEvent), EventSerializer.Serialize(closedEvent)]);
-		var auctionService = new AuctionService(provider);
-		var evaluator = new RemoveImagesEvaluator(auctionService);
+		var evaluator = new RemoveImagesEvaluator();
 		var input = new AuctionImagesRemoved
 		{
 			AuctionId = auctionId,
 			ImageIds = [imageIds[0]]
 		};
 
-		var ex = await Assert.ThrowsAsync<InvariantViolation>(() =>
-			evaluator.EvaluateEventWithContext(input, CancellationToken.None));
+		var ex = Assert.Throws<InvariantViolation>(() =>
+			evaluator.Step(input, TestContext.From(
+				EventSerializer.Serialize(baseEvent),
+				EventSerializer.Serialize(addedEvent),
+				EventSerializer.Serialize(closedEvent))));
 
 		Assert.Equal("Cannot remove images from a closed auction.", ex.Message);
 	}
 
 	[Fact]
-	public async Task RemoveImages_NonexistentImage_ThrowsInvariantViolation()
+	public void RemoveImages_NonexistentImage_ThrowsInvariantViolation()
 	{
 		var auctionId = Guid.NewGuid();
 		var baseEvent = CreateBaseAppEvent(auctionId);
-		var provider = new InMemoryContextProvider([EventSerializer.Serialize(baseEvent)]);
-		var auctionService = new AuctionService(provider);
-		var evaluator = new RemoveImagesEvaluator(auctionService);
+		var evaluator = new RemoveImagesEvaluator();
 		var input = new AuctionImagesRemoved
 		{
 			AuctionId = auctionId,
 			ImageIds = [Guid.NewGuid()]
 		};
 
-		var ex = await Assert.ThrowsAsync<InvariantViolation>(() =>
-			evaluator.EvaluateEventWithContext(input, CancellationToken.None));
+		var ex = Assert.Throws<InvariantViolation>(() =>
+			evaluator.Step(input, TestContext.From(EventSerializer.Serialize(baseEvent))));
 
 		Assert.Contains("does not exist", ex.Message);
 	}
 
 	[Fact]
-	public async Task RemoveImages_NonexistentAuction_ThrowsInvariantViolation()
+	public void RemoveImages_NonexistentAuction_ThrowsInvariantViolation()
 	{
-		var provider = new InMemoryContextProvider([]);
-		var auctionService = new AuctionService(provider);
-		var evaluator = new RemoveImagesEvaluator(auctionService);
+		var evaluator = new RemoveImagesEvaluator();
 		var input = new AuctionImagesRemoved
 		{
 			AuctionId = Guid.NewGuid(),
 			ImageIds = [Guid.NewGuid()]
 		};
 
-		var ex = await Assert.ThrowsAsync<InvariantViolation>(() =>
-			evaluator.EvaluateEventWithContext(input, CancellationToken.None));
+		var ex = Assert.Throws<InvariantViolation>(() => evaluator.Step(input, TestContext.From()));
 
 		Assert.Equal("Auction does not exist.", ex.Message);
 	}

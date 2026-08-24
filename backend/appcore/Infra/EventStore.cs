@@ -23,7 +23,7 @@ public sealed record EventContext(IReadOnlyList<AppEvent> Events, long Head)
 public interface IEventReader
 {
 	// Single SELECT over the whole boundary (disjunction of selectors), ordered by sequence_id.
-	// Head is the global MAX(sequence_id) as of the same snapshot.
+	// Head is the MAX(sequence_id) over the matched events (0 when none match).
 	Task<EventContext> Read(EventSelector[] boundary, CancellationToken ct);
 }
 
@@ -69,15 +69,10 @@ public class DbEventStore : IEventStore, IEventReader
 
 		await using var cmd = Connection.CreateCommand();
 		cmd.CommandText = $"""
-			SELECT e.sequence_id, e.insertion_time, e.event_type, e.payload,
-			       (SELECT COALESCE(MAX(sequence_id), 0) FROM auction_events) AS head
-			FROM (SELECT 1) h
-			FULL OUTER JOIN (
-				SELECT sequence_id, insertion_time, event_type, payload
-				FROM auction_events
-				WHERE {predicate}
-			) e ON true
-			ORDER BY e.sequence_id
+			SELECT sequence_id, insertion_time, event_type, payload
+			FROM auction_events
+			WHERE {predicate}
+			ORDER BY sequence_id
 			""";
 		foreach (var parameter in parameters)
 			cmd.Parameters.Add(parameter);
@@ -87,17 +82,16 @@ public class DbEventStore : IEventStore, IEventReader
 		await using var reader = await cmd.ExecuteReaderAsync(ct);
 		while (await reader.ReadAsync(ct))
 		{
-			if (!reader.IsDBNull(0))
+			var sequenceId = reader.GetInt64(0);
+			rows.Add(new AppEvent
 			{
-				rows.Add(new AppEvent
-				{
-					SequenceId = reader.GetInt64(0),
-					InsertionTime = reader.GetDateTime(1),
-					EventType = reader.GetString(2),
-					Payload = JsonDocument.Parse(reader.GetString(3)),
-				});
-			}
-			head = reader.GetInt64(4);
+				SequenceId = sequenceId,
+				InsertionTime = reader.GetDateTime(1),
+				EventType = reader.GetString(2),
+				Payload = JsonDocument.Parse(reader.GetString(3)),
+			});
+			if (sequenceId > head)
+				head = sequenceId;
 		}
 
 		return new EventContext(rows, head);

@@ -25,7 +25,7 @@ internal sealed class InMemoryEventStore : IEventStore, IEventReader
 			.Where(e => EventPayload.Matches(e, boundary))
 			.OrderBy(e => e.SequenceId)
 			.ToList();
-		var head = _events.Count > 0 ? _events.Max(e => e.SequenceId) : 0L;
+		var head = matching.Count > 0 ? matching.Max(e => e.SequenceId) : 0L;
 		return Task.FromResult(new EventContext(matching, head));
 	}
 

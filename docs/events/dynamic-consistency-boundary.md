@@ -19,7 +19,7 @@ The pattern is generic across use cases — auction lifecycle events, user signu
 |---|---|
 | `EventSelector` | One conjunctive term: a set of event types **and** equality constraints on payload properties. |
 | `ConsistencyBoundary` | The disjunction of selectors consulted by a decision, plus `LastPosition`. |
-| `LastPosition` | Global `MAX(sequence_id)` at the time of the most recent full reload. |
+| `LastPosition` | `MAX(sequence_id)` over the events matching the boundary's selectors at the most recent read (`0` when none match). |
 | `EventContext` | Immutable snapshot: the events matching the boundary plus its `Head`. |
 | Dimension | A top-level scalar property of an event payload (e.g. `auctionId`, `userId`). Queries constrain dimensions; events carry them implicitly. |
 
@@ -133,7 +133,7 @@ The locks exist solely to stop two concurrent appends from both passing the exis
 
 - **Read-side locking:** every operation locks every partition it consulted, so two operations whose scopes can observe each other's writes always contend on a shared key.
 - **Write-side locking:** because every top-level scalar property is a dimension, any event that *matches* a selector necessarily carries the `(property, value)` pairs of that selector's constraints — so its inserter locks a key the reader holds. Cross-partition outputs (e.g. a `BidPlaced` decision emitting an `OwnerNotified` event for a different user) are still protected: the write-side lock derived from the notification's own properties makes readers of *that* partition serialize against us.
-- **Position check:** `LastPosition` is the global `MAX(sequence_id)` of the most recent full reload. Any event matching the boundary but absent from the loaded context must have `sequence_id > LastPosition` and is therefore detected. Full reloads keep this simple: the final snapshot always covers the whole boundary.
+- **Position check:** `LastPosition` is the `MAX(sequence_id)` over the events that matched the boundary at the most recent read (`0` when none matched — any matching event then invalidates). The read returns the complete matched set, so every matched event in the loaded context has `sequence_id ≤ LastPosition`; any event matching the boundary but appended concurrently has `sequence_id > LastPosition` (the global sequence is monotonic) and is therefore detected.
 - **Event validity:** event payloads must be JSON objects, and every persisted event must carry at least one top-level scalar property (a property-less event could never be matched by any scope and would silently live outside all consistency boundaries).
 
 ## Conflict handling

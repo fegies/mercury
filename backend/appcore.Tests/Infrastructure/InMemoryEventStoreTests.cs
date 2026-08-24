@@ -36,14 +36,31 @@ public class InMemoryEventStoreTests
 	}
 
 	[Fact]
-	public async Task Read_HeadReflectsGlobalMaxEvenWhenNothingMatches()
+	public async Task Read_HeadIsZeroWhenNothingMatches()
 	{
 		var store = new InMemoryEventStore([Event(Created(Guid.NewGuid()), 5)]);
 
 		var context = await store.Read([EventSelector.ForAuction(Guid.NewGuid(), EventTypeNames.Auction)], CancellationToken.None);
 
 		Assert.Empty(context.Events);
-		Assert.Equal(5, context.Head);
+		Assert.Equal(0, context.Head);
+	}
+
+	[Fact]
+	public async Task Read_HeadIsMaxMatchedSequenceId()
+	{
+		var auctionX = Guid.NewGuid();
+		var auctionY = Guid.NewGuid();
+		var store = new InMemoryEventStore([
+			Event(Created(auctionY), 4),
+			Event(Created(auctionX), 7),
+			Event(Created(auctionX), 9),
+		]);
+
+		var context = await store.Read([EventSelector.ForAuction(auctionX, EventTypeNames.Auction)], CancellationToken.None);
+
+		Assert.Equal(2, context.Events.Count);
+		Assert.Equal(9, context.Head);
 	}
 
 	[Fact]

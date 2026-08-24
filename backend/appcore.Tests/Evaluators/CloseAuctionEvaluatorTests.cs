@@ -1,8 +1,6 @@
-using appcore.Entities;
 using appcore.Entities.Events;
 using appcore.Infra;
 using appcore.Infra.Evaluators;
-using appcore.Services;
 using appcore.Tests.Infrastructure;
 using Xunit;
 
@@ -20,26 +18,25 @@ public class CloseAuctionEvaluatorTests
 	};
 
 	[Fact]
-	public async Task Close_OpenAuction_ReturnsTrue()
+	public void Close_OpenAuction_ReturnsTrue()
 	{
 		var auctionId = Guid.NewGuid();
 		var baseEvent = CreateBaseAppEvent(auctionId);
-		var provider = new InMemoryContextProvider([EventSerializer.Serialize(baseEvent)]);
-		var auctionService = new AuctionService(provider);
-		var evaluator = new CloseAuctionEvaluator(auctionService);
+		var evaluator = new CloseAuctionEvaluator();
 		var input = new AuctionClosed
 		{
 			AuctionId = auctionId,
 			Reason = AuctionCloseReason.Manual
 		};
 
-		var result = await evaluator.EvaluateEventWithContext(input, CancellationToken.None);
+		var step = evaluator.Step(input, TestContext.From(EventSerializer.Serialize(baseEvent)));
 
+		var result = Assert.IsType<DecisionStep<bool>.Complete>(step);
 		Assert.True(result.Value);
 	}
 
 	[Fact]
-	public async Task Close_AlreadyClosed_ThrowsInvariantViolation()
+	public void Close_AlreadyClosed_ThrowsInvariantViolation()
 	{
 		var auctionId = Guid.NewGuid();
 		var baseEvent = CreateBaseAppEvent(auctionId);
@@ -48,57 +45,51 @@ public class CloseAuctionEvaluatorTests
 			AuctionId = auctionId,
 			Reason = AuctionCloseReason.Manual
 		};
-		var provider = new InMemoryContextProvider([EventSerializer.Serialize(baseEvent), EventSerializer.Serialize(closedEvent)]);
-		var auctionService = new AuctionService(provider);
-		var evaluator = new CloseAuctionEvaluator(auctionService);
+		var evaluator = new CloseAuctionEvaluator();
 		var input = new AuctionClosed
 		{
 			AuctionId = auctionId,
 			Reason = AuctionCloseReason.Expired
 		};
 
-		var ex = await Assert.ThrowsAsync<InvariantViolation>(() =>
-			evaluator.EvaluateEventWithContext(input, CancellationToken.None));
+		var ex = Assert.Throws<InvariantViolation>(() =>
+			evaluator.Step(input, TestContext.From(EventSerializer.Serialize(baseEvent), EventSerializer.Serialize(closedEvent))));
 
 		Assert.Equal("Auction is already closed.", ex.Message);
 	}
 
 	[Fact]
-	public async Task Close_NonexistentAuction_ThrowsInvariantViolation()
+	public void Close_NonexistentAuction_ThrowsInvariantViolation()
 	{
-		var provider = new InMemoryContextProvider([]);
-		var auctionService = new AuctionService(provider);
-		var evaluator = new CloseAuctionEvaluator(auctionService);
+		var evaluator = new CloseAuctionEvaluator();
 		var input = new AuctionClosed
 		{
 			AuctionId = Guid.NewGuid(),
 			Reason = AuctionCloseReason.Manual
 		};
 
-		var ex = await Assert.ThrowsAsync<InvariantViolation>(() =>
-			evaluator.EvaluateEventWithContext(input, CancellationToken.None));
+		var ex = Assert.Throws<InvariantViolation>(() => evaluator.Step(input, TestContext.From()));
 
 		Assert.Equal("Auction does not exist.", ex.Message);
 	}
 
 	[Fact]
-	public async Task Close_EmitsCorrectReason()
+	public void Close_EmitsCorrectReason()
 	{
 		var auctionId = Guid.NewGuid();
 		var baseEvent = CreateBaseAppEvent(auctionId);
-		var provider = new InMemoryContextProvider([EventSerializer.Serialize(baseEvent)]);
-		var auctionService = new AuctionService(provider);
-		var evaluator = new CloseAuctionEvaluator(auctionService);
+		var evaluator = new CloseAuctionEvaluator();
 		var input = new AuctionClosed
 		{
 			AuctionId = auctionId,
 			Reason = AuctionCloseReason.Manual
 		};
 
-		var result = await evaluator.EvaluateEventWithContext(input, CancellationToken.None);
+		var step = evaluator.Step(input, TestContext.From(EventSerializer.Serialize(baseEvent)));
 
-		Assert.Single(result.GeneratedEvents);
-		var closedEvent = Assert.IsType<AuctionClosed>(result.GeneratedEvents[0]);
+		var result = Assert.IsType<DecisionStep<bool>.Complete>(step);
+		Assert.Single(result.EventsToAppend);
+		var closedEvent = Assert.IsType<AuctionClosed>(result.EventsToAppend[0]);
 		Assert.Equal(AuctionCloseReason.Manual, closedEvent.Reason);
 	}
 }

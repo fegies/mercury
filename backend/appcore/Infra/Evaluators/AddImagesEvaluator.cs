@@ -1,16 +1,15 @@
 using appcore.Entities.Events;
-using appcore.Services;
 
 namespace appcore.Infra.Evaluators;
 
-public class AddImagesEvaluator(AuctionService auctionService) : EventEvaluator<AuctionImagesAdded, bool>
+public class AddImagesEvaluator : IDecisionFunction<AuctionImagesAdded, bool>
 {
-	public async Task<EvaluatorResult<bool>> EvaluateEventWithContext(
-		AuctionImagesAdded input,
-		CancellationToken ct
-	)
+	public EventSelector InitialSelector(AuctionImagesAdded input)
+		=> EventSelector.ForAuction(input.AuctionId, EventTypeNames.Auction);
+
+	public DecisionStep<bool> Step(AuctionImagesAdded input, EventContext context)
 	{
-		var state = await auctionService.GetAuctionState(input.AuctionId);
+		var state = AuctionFold.State(context);
 
 		if (state.AuctionId == Guid.Empty)
 			throw new InvariantViolation("Auction does not exist.");
@@ -21,6 +20,6 @@ public class AddImagesEvaluator(AuctionService auctionService) : EventEvaluator<
 		if (input.Images.Count == 0)
 			throw new InvariantViolation("Must provide at least one image.");
 
-		return new EvaluatorResult<bool>(true, [input]);
+		return new DecisionStep<bool>.Complete(true, [input]);
 	}
 }

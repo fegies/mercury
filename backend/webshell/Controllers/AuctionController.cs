@@ -80,7 +80,7 @@ public class AuctionController(AuctionService auctionService, ApplicationDbConte
         };
 
         var store = new DbEventStore(ctx);
-        var handler = new IncomingEventHandler<AuctionCreated, Guid>(store, new CreateAuctionEvaluator(auctionService));
+        var handler = new IncomingEventHandler<AuctionCreated, Guid>(store, new CreateAuctionEvaluator(), new EventHandlerOptions());
 
         try
         {
@@ -113,7 +113,7 @@ public class AuctionController(AuctionService auctionService, ApplicationDbConte
         };
 
         var store = new DbEventStore(ctx);
-        var handler = new IncomingEventHandler<AuctionUpdated, bool>(store, new UpdateAuctionEvaluator(auctionService));
+        var handler = new IncomingEventHandler<AuctionUpdated, bool>(store, new UpdateAuctionEvaluator(), new EventHandlerOptions());
 
         try
         {
@@ -150,7 +150,7 @@ public class AuctionController(AuctionService auctionService, ApplicationDbConte
         };
 
         var store = new DbEventStore(ctx);
-        var handler = new IncomingEventHandler<AuctionImagesRemoved, bool>(store, new RemoveImagesEvaluator(auctionService));
+        var handler = new IncomingEventHandler<AuctionImagesRemoved, bool>(store, new RemoveImagesEvaluator(), new EventHandlerOptions());
 
         try
         {
@@ -179,7 +179,7 @@ public class AuctionController(AuctionService auctionService, ApplicationDbConte
         };
 
         var store = new DbEventStore(ctx);
-        var handler = new IncomingEventHandler<AuctionClosed, bool>(store, new CloseAuctionEvaluator(auctionService));
+        var handler = new IncomingEventHandler<AuctionClosed, bool>(store, new CloseAuctionEvaluator(), new EventHandlerOptions());
 
         try
         {
@@ -260,7 +260,7 @@ public class AuctionController(AuctionService auctionService, ApplicationDbConte
         };
 
         var store = new DbEventStore(ctx);
-        var handler = new IncomingEventHandler<AuctionImagesAdded, bool>(store, new AddImagesEvaluator(auctionService));
+        var handler = new IncomingEventHandler<AuctionImagesAdded, bool>(store, new AddImagesEvaluator(), new EventHandlerOptions());
 
         try
         {

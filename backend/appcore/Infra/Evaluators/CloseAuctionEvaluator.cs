@@ -1,16 +1,15 @@
 using appcore.Entities.Events;
-using appcore.Services;
 
 namespace appcore.Infra.Evaluators;
 
-public class CloseAuctionEvaluator(AuctionService auctionService) : EventEvaluator<AuctionClosed, bool>
+public class CloseAuctionEvaluator : IDecisionFunction<AuctionClosed, bool>
 {
-	public async Task<EvaluatorResult<bool>> EvaluateEventWithContext(
-		AuctionClosed input,
-		CancellationToken ct
-	)
+	public EventSelector InitialSelector(AuctionClosed input)
+		=> EventSelector.ForAuction(input.AuctionId, EventTypeNames.Auction);
+
+	public DecisionStep<bool> Step(AuctionClosed input, EventContext context)
 	{
-		var state = await auctionService.GetAuctionState(input.AuctionId);
+		var state = AuctionFold.State(context);
 
 		if (state.AuctionId == Guid.Empty)
 			throw new InvariantViolation("Auction does not exist.");
@@ -18,6 +17,6 @@ public class CloseAuctionEvaluator(AuctionService auctionService) : EventEvaluat
 		if (state.IsClosed)
 			throw new InvariantViolation("Auction is already closed.");
 
-		return new EvaluatorResult<bool>(true, [input]);
+		return new DecisionStep<bool>.Complete(true, [input]);
 	}
 }

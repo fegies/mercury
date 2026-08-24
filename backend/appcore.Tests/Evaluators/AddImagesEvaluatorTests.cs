@@ -1,8 +1,6 @@
-using appcore.Entities;
 using appcore.Entities.Events;
 using appcore.Infra;
 using appcore.Infra.Evaluators;
-using appcore.Services;
 using appcore.Tests.Infrastructure;
 using Xunit;
 
@@ -30,22 +28,21 @@ public class AddImagesEvaluatorTests
 	};
 
 	[Fact]
-	public async Task AddImages_OpenAuction_ReturnsTrue()
+	public void AddImages_OpenAuction_ReturnsTrue()
 	{
 		var auctionId = Guid.NewGuid();
 		var baseEvent = CreateBaseAppEvent(auctionId);
-		var provider = new InMemoryContextProvider([EventSerializer.Serialize(baseEvent)]);
-		var auctionService = new AuctionService(provider);
-		var evaluator = new AddImagesEvaluator(auctionService);
+		var evaluator = new AddImagesEvaluator();
 		var input = CreateImagesEvent(auctionId);
 
-		var result = await evaluator.EvaluateEventWithContext(input, CancellationToken.None);
+		var step = evaluator.Step(input, TestContext.From(EventSerializer.Serialize(baseEvent)));
 
+		var result = Assert.IsType<DecisionStep<bool>.Complete>(step);
 		Assert.True(result.Value);
 	}
 
 	[Fact]
-	public async Task AddImages_ClosedAuction_ThrowsInvariantViolation()
+	public void AddImages_ClosedAuction_ThrowsInvariantViolation()
 	{
 		var auctionId = Guid.NewGuid();
 		var baseEvent = CreateBaseAppEvent(auctionId);
@@ -54,47 +51,40 @@ public class AddImagesEvaluatorTests
 			AuctionId = auctionId,
 			Reason = AuctionCloseReason.Manual
 		};
-		var provider = new InMemoryContextProvider([EventSerializer.Serialize(baseEvent), EventSerializer.Serialize(closedEvent)]);
-		var auctionService = new AuctionService(provider);
-		var evaluator = new AddImagesEvaluator(auctionService);
+		var evaluator = new AddImagesEvaluator();
 		var input = CreateImagesEvent(auctionId);
 
-		var ex = await Assert.ThrowsAsync<InvariantViolation>(() =>
-			evaluator.EvaluateEventWithContext(input, CancellationToken.None));
+		var ex = Assert.Throws<InvariantViolation>(() =>
+			evaluator.Step(input, TestContext.From(EventSerializer.Serialize(baseEvent), EventSerializer.Serialize(closedEvent))));
 
 		Assert.Equal("Cannot add images to a closed auction.", ex.Message);
 	}
 
 	[Fact]
-	public async Task AddImages_NonexistentAuction_ThrowsInvariantViolation()
+	public void AddImages_NonexistentAuction_ThrowsInvariantViolation()
 	{
-		var provider = new InMemoryContextProvider([]);
-		var auctionService = new AuctionService(provider);
-		var evaluator = new AddImagesEvaluator(auctionService);
+		var evaluator = new AddImagesEvaluator();
 		var input = CreateImagesEvent(Guid.NewGuid());
 
-		var ex = await Assert.ThrowsAsync<InvariantViolation>(() =>
-			evaluator.EvaluateEventWithContext(input, CancellationToken.None));
+		var ex = Assert.Throws<InvariantViolation>(() => evaluator.Step(input, TestContext.From()));
 
 		Assert.Equal("Auction does not exist.", ex.Message);
 	}
 
 	[Fact]
-	public async Task AddImages_EmptyList_ThrowsInvariantViolation()
+	public void AddImages_EmptyList_ThrowsInvariantViolation()
 	{
 		var auctionId = Guid.NewGuid();
 		var baseEvent = CreateBaseAppEvent(auctionId);
-		var provider = new InMemoryContextProvider([EventSerializer.Serialize(baseEvent)]);
-		var auctionService = new AuctionService(provider);
-		var evaluator = new AddImagesEvaluator(auctionService);
+		var evaluator = new AddImagesEvaluator();
 		var input = new AuctionImagesAdded
 		{
 			AuctionId = auctionId,
 			Images = []
 		};
 
-		var ex = await Assert.ThrowsAsync<InvariantViolation>(() =>
-			evaluator.EvaluateEventWithContext(input, CancellationToken.None));
+		var ex = Assert.Throws<InvariantViolation>(() =>
+			evaluator.Step(input, TestContext.From(EventSerializer.Serialize(baseEvent))));
 
 		Assert.Equal("Must provide at least one image.", ex.Message);
 	}

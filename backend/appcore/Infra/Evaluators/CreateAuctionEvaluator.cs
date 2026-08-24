@@ -1,14 +1,13 @@
 using appcore.Entities.Events;
-using appcore.Services;
 
 namespace appcore.Infra.Evaluators;
 
-public class CreateAuctionEvaluator(AuctionService auctionService) : EventEvaluator<AuctionCreated, Guid>
+public class CreateAuctionEvaluator : IDecisionFunction<AuctionCreated, Guid>
 {
-	public async Task<EvaluatorResult<Guid>> EvaluateEventWithContext(
-		AuctionCreated input,
-		CancellationToken ct
-	)
+	public EventSelector InitialSelector(AuctionCreated input)
+		=> EventSelector.ForAuction(input.AuctionId, EventTypeNames.Auction);
+
+	public DecisionStep<Guid> Step(AuctionCreated input, EventContext context)
 	{
 		if (string.IsNullOrEmpty(input.Title))
 			throw new InvariantViolation("Title must be non-empty.");
@@ -19,10 +18,10 @@ public class CreateAuctionEvaluator(AuctionService auctionService) : EventEvalua
 		if (input.ClosureTime <= DateTime.UtcNow)
 			throw new InvariantViolation("Closure time must be in the future.");
 
-		var state = await auctionService.GetAuctionState(input.AuctionId);
+		var state = AuctionFold.State(context);
 		if (state.AuctionId != Guid.Empty)
 			throw new InvariantViolation("An auction with this ID already exists.");
 
-		return new EvaluatorResult<Guid>(input.AuctionId, [input]);
+		return new DecisionStep<Guid>.Complete(input.AuctionId, [input]);
 	}
 }

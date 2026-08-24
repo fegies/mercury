@@ -21,8 +21,8 @@ public class AuctionServiceTests
 	[Fact]
 	public async Task GetAuctionState_ReturnsEmptyForUnknownId()
 	{
-		var provider = new InMemoryContextProvider([]);
-		var service = new AuctionService(provider);
+		var store = new InMemoryEventStore([]);
+		var service = new AuctionService(store);
 
 		var state = await service.GetAuctionState(Guid.NewGuid());
 
@@ -34,8 +34,8 @@ public class AuctionServiceTests
 	{
 		var auctionId = Guid.NewGuid();
 		var created = CreateCreatedEvent(auctionId);
-		var provider = new InMemoryContextProvider([EventSerializer.Serialize(created)]);
-		var service = new AuctionService(provider);
+		var store = new InMemoryEventStore([EventSerializer.Serialize(created)]);
+		var service = new AuctionService(store);
 
 		var state = await service.GetAuctionState(auctionId);
 
@@ -58,11 +58,11 @@ public class AuctionServiceTests
 			Title = "Updated Title",
 			MinimumPrice = 50.00m,
 		};
-		var provider = new InMemoryContextProvider([
+		var store = new InMemoryEventStore([
 			EventSerializer.Serialize(created),
 			EventSerializer.Serialize(updated),
 		]);
-		var service = new AuctionService(provider);
+		var service = new AuctionService(store);
 
 		var state = await service.GetAuctionState(auctionId);
 
@@ -92,12 +92,12 @@ public class AuctionServiceTests
 			AuctionId = auctionId,
 			ImageIds = [image1Id],
 		};
-		var provider = new InMemoryContextProvider([
+		var store = new InMemoryEventStore([
 			EventSerializer.Serialize(created),
 			EventSerializer.Serialize(imagesAdded),
 			EventSerializer.Serialize(imagesRemoved),
 		]);
-		var service = new AuctionService(provider);
+		var service = new AuctionService(store);
 
 		var state = await service.GetAuctionState(auctionId);
 
@@ -115,11 +115,11 @@ public class AuctionServiceTests
 			AuctionId = auctionId,
 			Reason = AuctionCloseReason.Manual,
 		};
-		var provider = new InMemoryContextProvider([
+		var store = new InMemoryEventStore([
 			EventSerializer.Serialize(created),
 			EventSerializer.Serialize(closed),
 		]);
-		var service = new AuctionService(provider);
+		var service = new AuctionService(store);
 
 		var state = await service.GetAuctionState(auctionId);
 
@@ -147,8 +147,8 @@ public class AuctionServiceTests
 			EventSerializer.Serialize(update1) with { SequenceId = 2 },
 			EventSerializer.Serialize(update2) with { SequenceId = 3 },
 		};
-		var provider = new InMemoryContextProvider(rows);
-		var service = new AuctionService(provider);
+		var store = new InMemoryEventStore(rows);
+		var service = new AuctionService(store);
 
 		var state = await service.GetAuctionState(auctionId);
 
@@ -176,8 +176,8 @@ public class AuctionServiceTests
 			EventSerializer.Serialize(update2) with { SequenceId = 2 },
 			EventSerializer.Serialize(update1) with { SequenceId = 3 },
 		};
-		var provider = new InMemoryContextProvider(rows);
-		var service = new AuctionService(provider);
+		var store = new InMemoryEventStore(rows);
+		var service = new AuctionService(store);
 
 		var state = await service.GetAuctionState(auctionId);
 
@@ -191,11 +191,11 @@ public class AuctionServiceTests
 		var otherId = Guid.NewGuid();
 		var created = CreateCreatedEvent(auctionId);
 		var otherCreated = CreateCreatedEvent(otherId);
-		var provider = new InMemoryContextProvider([
+		var store = new InMemoryEventStore([
 			EventSerializer.Serialize(created),
 			EventSerializer.Serialize(otherCreated),
 		]);
-		var service = new AuctionService(provider);
+		var service = new AuctionService(store);
 
 		var state = await service.GetAuctionState(auctionId);
 
@@ -211,12 +211,12 @@ public class AuctionServiceTests
 		var created1 = CreateCreatedEvent(id1);
 		var created2 = CreateCreatedEvent(id2);
 		var updated1 = new AuctionUpdated { AuctionId = id1, Title = "Updated" };
-		var provider = new InMemoryContextProvider([
+		var store = new InMemoryEventStore([
 			EventSerializer.Serialize(created1),
 			EventSerializer.Serialize(created2),
 			EventSerializer.Serialize(updated1),
 		]);
-		var service = new AuctionService(provider);
+		var service = new AuctionService(store);
 
 		var ids = await service.GetAllAuctionIds();
 
@@ -228,8 +228,8 @@ public class AuctionServiceTests
 	[Fact]
 	public async Task GetAuctionSummary_ReturnsNullForUnknownId()
 	{
-		var provider = new InMemoryContextProvider([]);
-		var service = new AuctionService(provider);
+		var store = new InMemoryEventStore([]);
+		var service = new AuctionService(store);
 
 		var summary = await service.GetAuctionSummary(Guid.NewGuid());
 
@@ -247,11 +247,11 @@ public class AuctionServiceTests
 			AuctionId = auctionId,
 			Images = [new AuctionImageRef { Id = imageId, FilePath = "/img.jpg", Hash = "abc" }],
 		};
-		var provider = new InMemoryContextProvider([
+		var store = new InMemoryEventStore([
 			EventSerializer.Serialize(created),
 			EventSerializer.Serialize(imagesAdded),
 		]);
-		var service = new AuctionService(provider);
+		var service = new AuctionService(store);
 
 		var summary = await service.GetAuctionSummary(auctionId);
 
@@ -269,11 +269,11 @@ public class AuctionServiceTests
 	{
 		var id1 = Guid.NewGuid();
 		var id2 = Guid.NewGuid();
-		var provider = new InMemoryContextProvider([
+		var store = new InMemoryEventStore([
 			EventSerializer.Serialize(CreateCreatedEvent(id1)),
 			EventSerializer.Serialize(CreateCreatedEvent(id2)),
 		]);
-		var service = new AuctionService(provider);
+		var service = new AuctionService(store);
 
 		var summaries = await service.ListAuctionSummaries();
 

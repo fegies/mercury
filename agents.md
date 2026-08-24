@@ -94,9 +94,10 @@ nix develop     # Enter dev shell
 
 ### Event Sourcing
 
-- `StoredEvent` base class with `SequenceId` (optimistic concurrency)
-- `OperationHandler.cs` provides `DbEventStore` and `IncomingEventHandler` with retry logic
-- Events processed in serializable transactions for consistency
+- `StoredEvent` base class with global `SequenceId`
+- `OperationHandler.cs` provides the Dynamic Consistency Boundary infra: `EventSelector`/`ConsistencyBoundary`, `IEventReader`, `IEventStore`/`DbEventStore`, `IDecisionFunction`, `IncomingEventHandler` with retry logic
+- Commits run under READ COMMITTED with advisory locks derived from payload dimensions; `IncomingEventHandler` retries on `ConcurrencyConflictException` (sequential consistency by retry)
+- Full scheme: `docs/events/dynamic-consistency-boundary.md`
 
 ## File Locations
 

@@ -1,16 +1,15 @@
 using appcore.Entities.Events;
-using appcore.Services;
 
 namespace appcore.Infra.Evaluators;
 
-public class RemoveImagesEvaluator(AuctionService auctionService) : EventEvaluator<AuctionImagesRemoved, bool>
+public class RemoveImagesEvaluator : IDecisionFunction<AuctionImagesRemoved, bool>
 {
-	public async Task<EvaluatorResult<bool>> EvaluateEventWithContext(
-		AuctionImagesRemoved input,
-		CancellationToken ct
-	)
+	public EventSelector InitialSelector(AuctionImagesRemoved input)
+		=> EventSelector.ForAuction(input.AuctionId, EventTypeNames.Auction);
+
+	public DecisionStep<bool> Step(AuctionImagesRemoved input, EventContext context)
 	{
-		var state = await auctionService.GetAuctionState(input.AuctionId);
+		var state = AuctionFold.State(context);
 
 		if (state.AuctionId == Guid.Empty)
 			throw new InvariantViolation("Auction does not exist.");
@@ -25,6 +24,6 @@ public class RemoveImagesEvaluator(AuctionService auctionService) : EventEvaluat
 				throw new InvariantViolation($"Image with ID {imageId} does not exist.");
 		}
 
-		return new EvaluatorResult<bool>(true, [input]);
+		return new DecisionStep<bool>.Complete(true, [input]);
 	}
 }

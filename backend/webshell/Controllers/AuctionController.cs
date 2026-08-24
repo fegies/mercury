@@ -13,7 +13,13 @@ namespace backend.Controllers;
 
 [Route("api/auctions")]
 [ApiController]
-public class AuctionController(AuctionService auctionService, IEventStore eventStore) : ControllerBase
+public class AuctionController(
+    AuctionService auctionService,
+    IncomingEventHandler<AuctionCreated, Guid> createAuctionHandler,
+    IncomingEventHandler<AuctionUpdated, bool> updateAuctionHandler,
+    IncomingEventHandler<AuctionImagesRemoved, bool> removeImagesHandler,
+    IncomingEventHandler<AuctionClosed, bool> closeAuctionHandler,
+    IncomingEventHandler<AuctionImagesAdded, bool> addImagesHandler) : ControllerBase
 {
     private const string AuctionImagesBasePath = "data/auctions";
 
@@ -78,11 +84,9 @@ public class AuctionController(AuctionService auctionService, IEventStore eventS
             ClosureTime = request.ClosureTime,
         };
 
-        var handler = new IncomingEventHandler<AuctionCreated, Guid>(eventStore, new CreateAuctionEvaluator(), new EventHandlerOptions());
-
         try
         {
-            await handler.Execute(createdEvent, ct);
+            await createAuctionHandler.Execute(createdEvent, ct);
         }
         catch (InvariantViolation ex)
         {
@@ -110,11 +114,9 @@ public class AuctionController(AuctionService auctionService, IEventStore eventS
             ClosureTime = request.ClosureTime,
         };
 
-        var handler = new IncomingEventHandler<AuctionUpdated, bool>(eventStore, new UpdateAuctionEvaluator(), new EventHandlerOptions());
-
         try
         {
-            await handler.Execute(updatedEvent, ct);
+            await updateAuctionHandler.Execute(updatedEvent, ct);
         }
         catch (InvariantViolation ex)
         {
@@ -146,11 +148,9 @@ public class AuctionController(AuctionService auctionService, IEventStore eventS
             ImageIds = [imageId],
         };
 
-        var handler = new IncomingEventHandler<AuctionImagesRemoved, bool>(eventStore, new RemoveImagesEvaluator(), new EventHandlerOptions());
-
         try
         {
-            await handler.Execute(removedEvent, ct);
+            await removeImagesHandler.Execute(removedEvent, ct);
         }
         catch (InvariantViolation ex)
         {
@@ -174,11 +174,9 @@ public class AuctionController(AuctionService auctionService, IEventStore eventS
             Reason = AuctionCloseReason.Manual,
         };
 
-        var handler = new IncomingEventHandler<AuctionClosed, bool>(eventStore, new CloseAuctionEvaluator(), new EventHandlerOptions());
-
         try
         {
-            await handler.Execute(closedEvent, ct);
+            await closeAuctionHandler.Execute(closedEvent, ct);
         }
         catch (InvariantViolation ex)
         {
@@ -254,11 +252,9 @@ public class AuctionController(AuctionService auctionService, IEventStore eventS
             Images = imageRefs,
         };
 
-        var handler = new IncomingEventHandler<AuctionImagesAdded, bool>(eventStore, new AddImagesEvaluator(), new EventHandlerOptions());
-
         try
         {
-            await handler.Execute(addedEvent, ct);
+            await addImagesHandler.Execute(addedEvent, ct);
         }
         catch (InvariantViolation ex)
         {

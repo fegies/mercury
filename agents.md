@@ -11,6 +11,7 @@ Self-hosted auction platform for organization-internal auctions. SvelteKit front
 - **Always create a PR** for any changes made to the codebase. Commit, push to a feature branch, and open a pull request.
 - **Always sync from upstream** before starting work. Run `git fetch upstream && git merge upstream/main` on your branch to stay up to date.
 - **No warnings before you are done.** `dotnet build` and `dotnet test` must produce zero warnings. Frontend `npm run check` must produce zero new errors. Fix or suppress all warnings before considering work complete.
+- **Controllers stay slim.** Never construct handlers, event stores, or services manually inside controllers — register them with DI and inject them via the constructor (prefer the two-parameter `AddScoped<Interface, ImplementingType>()` variant). A controller should only parse the request, call injected collaborators, and map results/errors.
 
 ## Commands
 
@@ -95,7 +96,9 @@ nix develop     # Enter dev shell
 ### Event Sourcing
 
 - `StoredEvent` base class with global `SequenceId`
-- `OperationHandler.cs` provides the Dynamic Consistency Boundary infra: `EventSelector`/`ConsistencyBoundary`, `IEventReader`, `IEventStore`/`DbEventStore`, `IDecisionFunction`, `IncomingEventHandler` with retry logic
+- `OperationHandler.cs` provides the DCB query language and orchestrator: `EventSelector`/`ConsistencyBoundary`, `IDecisionFunction`, `IncomingEventHandler` with retry logic
+- `EventStore.cs` holds the contracts: `EventContext`, `IEventReader`, `IEventStore`, `ConcurrencyConflictException`; `DbEventStore.cs` is the PostgreSQL-backed implementation (advisory locks, SHA1 lock keys)
+- Handlers and evaluators are registered in DI (`StartupExtension.RegisterAppcoreServices`) and injected into controllers — never constructed manually
 - Commits run under READ COMMITTED with advisory locks derived from payload dimensions; `IncomingEventHandler` retries on `ConcurrencyConflictException` (sequential consistency by retry)
 - Full scheme: `docs/events/dynamic-consistency-boundary.md`
 

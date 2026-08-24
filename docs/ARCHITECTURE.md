@@ -69,12 +69,12 @@ Startup sequence:
 - `StoredEvent` — Abstract base for event sourcing (SequenceId, InsertionTime)
 - `AuctionCreated` — Event: AuctionId, Title, ClosureTime
 
-**Event Sourcing Infrastructure** (`OperationHandler.cs`) — [Dynamic Consistency Boundary](events/dynamic-consistency-boundary.md):
-- `EventSelector` / `ConsistencyBoundary` — Declarative scopes: event types + payload constraints; a boundary is a disjunction of selectors plus `LastPosition`
-- `IEventReader` / `EventContext` — Lock-free scoped reads; the context is the loaded snapshot plus its head
-- `IDecisionFunction<TEvent, TResult>` / `DecisionStep` — Pure synchronous decisions that may request a wider scope (`NeedMoreContext`) or complete with a result and optional events
-- `IEventStore` / `DbEventStore` — Conditional append under READ COMMITTED with advisory locks derived from payload dimensions; re-checks the scope at insert time
+**Event Sourcing Infrastructure** — [Dynamic Consistency Boundary](events/dynamic-consistency-boundary.md):
+- `OperationHandler.cs` — DCB query language and orchestrator: `EventSelector`/`ConsistencyBoundary`, `IDecisionFunction`/`DecisionStep`, `IncomingEventHandler`
+- `EventStore.cs` — Contracts: `EventContext`, `IEventReader`, `IEventStore`, `ConcurrencyConflictException`
+- `DbEventStore.cs` — PostgreSQL-backed implementation: conditional append under READ COMMITTED with advisory locks derived from payload dimensions; re-checks the scope at insert time
 - `IncomingEventHandler` — Orchestrates gather → decide → append, retrying the whole pipeline on `ConcurrencyConflictException`
+- Handlers, evaluators, and event stores are registered in DI and injected into controllers (controllers never construct them manually)
 
 **Note:** Event types live in `appcore.Entities.Events`.
 

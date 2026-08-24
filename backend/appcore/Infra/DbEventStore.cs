@@ -86,45 +86,57 @@ public class DbEventStore : IEventStore, IEventReader
 
 		await using var trans = await Connection.BeginTransactionAsync(System.Data.IsolationLevel.ReadCommitted, ct);
 
+		// Single roundtrip: acquire all advisory locks, then re-check the scope as the last batch command.
+		// Locks precede the check so overlapping appends serialize before the scope is re-evaluated (write-skew prevention under READ COMMITTED).
+		var (predicate, parameters) = BuildBoundaryPredicate(boundary.Selectors.ToArray());
+		await using var batch = new NpgsqlBatch(Connection)
+		{
+			Transaction = trans,
+		};
 		foreach (var (property, value) in lockKeys)
 		{
-			await using var lockCmd = Connection.CreateCommand();
-			lockCmd.Transaction = trans;
-			lockCmd.CommandText = "SELECT pg_advisory_xact_lock(@key)";
+			var lockCmd = new NpgsqlBatchCommand("SELECT pg_advisory_xact_lock(@key)");
 			lockCmd.Parameters.Add(new NpgsqlParameter("key", NpgsqlDbType.Bigint) { Value = StableHash(property, value) });
-			await lockCmd.ExecuteNonQueryAsync(ct);
+			batch.BatchCommands.Add(lockCmd);
 		}
-
-		var (predicate, parameters) = BuildBoundaryPredicate(boundary.Selectors.ToArray());
-		await using var checkCmd = Connection.CreateCommand();
-		checkCmd.Transaction = trans;
-		checkCmd.CommandText = $"""
+		var checkCmd = new NpgsqlBatchCommand($"""
 			SELECT EXISTS (
 				SELECT 1 FROM auction_events
 				WHERE sequence_id > @head AND ({predicate})
 			)
-			""";
+			""");
 		checkCmd.Parameters.Add(new NpgsqlParameter("head", NpgsqlDbType.Bigint) { Value = boundary.LastPosition });
 		foreach (var parameter in parameters)
 			checkCmd.Parameters.Add(parameter);
+		batch.BatchCommands.Add(checkCmd);
 
-		var conflicted = (bool)(await checkCmd.ExecuteScalarAsync(ct))!;
+		await using var reader = await batch.ExecuteReaderAsync(ct);
+		for (var i = 0; i < lockKeys.Count; i++)
+		{
+			while (await reader.ReadAsync(ct)) { }
+			await reader.NextResultAsync(ct);
+		}
+		var conflicted = await reader.ReadAsync(ct) && reader.GetBoolean(0);
 		if (conflicted)
 			throw new ConcurrencyConflictException();
 
+		// Single roundtrip: insert all result events.
+		await using var insertBatch = new NpgsqlBatch(Connection)
+		{
+			Transaction = trans,
+		};
 		foreach (var row in serialized)
 		{
-			await using var cmd = Connection.CreateCommand();
-			cmd.Transaction = trans;
-			cmd.CommandText = """
+			var insertCmd = new NpgsqlBatchCommand("""
 				INSERT INTO auction_events (insertion_time, event_type, payload)
 				VALUES (@insertion_time, @event_type, @payload::jsonb)
-				""";
-			cmd.Parameters.Add(new NpgsqlParameter("insertion_time", NpgsqlDbType.TimestampTz) { Value = row.InsertionTime });
-			cmd.Parameters.Add(new NpgsqlParameter("event_type", NpgsqlDbType.Text) { Value = row.EventType });
-			cmd.Parameters.Add(new NpgsqlParameter("payload", NpgsqlDbType.Jsonb) { Value = row.Payload.RootElement.GetRawText() });
-			await cmd.ExecuteNonQueryAsync(ct);
+				""");
+			insertCmd.Parameters.Add(new NpgsqlParameter("insertion_time", NpgsqlDbType.TimestampTz) { Value = row.InsertionTime });
+			insertCmd.Parameters.Add(new NpgsqlParameter("event_type", NpgsqlDbType.Text) { Value = row.EventType });
+			insertCmd.Parameters.Add(new NpgsqlParameter("payload", NpgsqlDbType.Jsonb) { Value = row.Payload.RootElement.GetRawText() });
+			insertBatch.BatchCommands.Add(insertCmd);
 		}
+		await insertBatch.ExecuteNonQueryAsync(ct);
 
 		await trans.CommitAsync(ct);
 	}

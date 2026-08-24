@@ -129,6 +129,8 @@ COMMIT;
 
 The locks exist solely to stop two concurrent appends from both passing the existence check (write skew under READ COMMITTED). They are held only for the duration of the append — never during information gathering. Unrelated partitions do not share keys and do not contend; only genuine scope overlap serializes.
 
+Roundtrips are minimized: all advisory locks plus the scope re-check are sent as a single `NpgsqlBatch` (check last, so it runs after all locks are held), and all inserts go out in a second single batch — two roundtrips per append regardless of the number of lock keys or events.
+
 ## Soundness
 
 - **Read-side locking:** every operation locks every partition it consulted, so two operations whose scopes can observe each other's writes always contend on a shared key.

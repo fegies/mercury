@@ -32,8 +32,6 @@ npm run openapi-ts   # Regenerate API client from backend OpenAPI spec
 dotnet build                              # Build solution
 dotnet run --project webshell             # Run backend (port 5023)
 dotnet test                               # Run all tests
-dotnet ef database update                 # Apply EF migrations
-dotnet ef migrations add <Name>           # Add new migration (in appcore dir)
 dotnet tool run openapi spec --output openapi/backend.json  # Export OpenAPI spec
 ```
 
@@ -89,8 +87,9 @@ nix develop     # Enter dev shell
 
 ### Database
 
-- **EF Core** for `Users` table (migrations in `appcore/Migrations/`)
-- **Raw SQL** (postgres-js) for auctions, bids, images in frontend server routes
+- **PostgreSQL** via raw Npgsql (`NpgsqlDataSource`); no ORM
+- **Event sourcing** for auctions and users (single `app_events` table); table is ensured at startup (`EventStoreSchema.EnsureCreatedAsync`)
+- **Raw SQL** (postgres-js) in frontend server routes for profile pictures
 - Database: PostgreSQL, named `mercury`
 
 ### Event Sourcing
@@ -98,6 +97,7 @@ nix develop     # Enter dev shell
 - `StoredEvent` base class with global `SequenceId`
 - `OperationHandler.cs` provides the DCB query language and orchestrator: `EventSelector`/`ConsistencyBoundary`, `IDecisionFunction`, `IncomingEventHandler` with retry logic
 - `EventStore.cs` holds the contracts: `EventContext`, `IEventReader`, `IEventStore`, `ConcurrencyConflictException`; `DbEventStore.cs` is the PostgreSQL-backed implementation (advisory locks, SHA1 lock keys)
+- User provisioning is event-sourced: `UserCreated` links an OIDC identity `(oidIss, oidSub)` to a `UserId`; `UserUpdated`/`UserRoleChanged` are keyed on `userId` alone so a user can hold multiple linked IdP identities. Roles are IdP-managed, the `mercury.role` claim is stamped from the live IdP claim at login
 - Handlers and evaluators are registered in DI (`StartupExtension.RegisterAppcoreServices`) and injected into controllers — never constructed manually
 - Commits run under READ COMMITTED with advisory locks derived from payload dimensions; `IncomingEventHandler` retries on `ConcurrencyConflictException` (sequential consistency by retry)
 - Full scheme: `docs/events/dynamic-consistency-boundary.md`
@@ -112,8 +112,7 @@ nix develop     # Enter dev shell
 | Domain types | `frontend/src/lib/types/` |
 | Backend controllers | `backend/webshell/Controllers/` |
 | Backend services | `backend/webshell/Services/impl/` |
-| Domain entities | `backend/appcore/Entities/` |
-| EF migrations | `backend/appcore/Migrations/` |
+| Domain events | `backend/appcore/Entities/Events/` |
 | Event sourcing infra | `backend/appcore/Infra/` |
 | Tests | `backend/appcore.Tests/` |
 | Config model | `backend/webshell/Configuration/` |

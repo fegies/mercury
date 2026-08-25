@@ -31,20 +31,20 @@ Self-hosted auction platform for organization-internal auctions. Users browse an
 | Project | Type | Purpose |
 |---|---|---|
 | `webshell` | Web SDK | HTTP layer — controllers, OIDC auth, service registration |
-| `appcore` | Class Library | Domain entities, EF DbContext, migrations, event-sourcing infra |
+| `appcore` | Class Library | Domain events, DCB event-sourcing infra, PostgreSQL access |
 
 ### Bootstrap (`Program.cs`)
 
 Startup sequence:
 1. Load and validate `BackendConfig` from appsettings
-2. Register EF Core (`ApplicationDbContext` with Npgsql/PostgreSQL)
+2. Register event-sourcing infra (`NpgsqlDataSource`, `DbEventStore`, evaluators, handlers)
 3. Register `UserProvisionService` and provider-specific `IUserProvisioner` (Zitadel or generic)
 4. Configure cookie + OIDC authentication (openid, profile, email scopes)
-5. `OnTicketReceived` triggers `UserProvisionService.ProvisionUser()` to create/update users
+5. `OnTicketReceived` triggers `UserProvisionService.ProvisionUser()` to provision users as domain events
 6. Authorization: `IsAdmin` policy + fallback `RequireAuthenticatedUser`
 7. OpenAPI spec generation (dev mode only)
 8. `WebStatusException` middleware for error handling
-9. Auto-migrate database on real launch
+9. Ensure the `app_events` table exists on real launch (`EventStoreSchema.EnsureCreatedAsync`)
 10. Map controllers
 
 ### Controllers
@@ -58,16 +58,18 @@ Startup sequence:
 
 | Service | Purpose |
 |---|---|
-| `UserProvisionService` | Finds or creates `UserEntity` from OIDC claims, adds `local_userid` claim |
-| `ZitadelUserProvisioner` | Extracts profile picture from `picture` claim, maps Zitadel roles to `mercury.role=Admin` |
-| `GeneriUserProvisioner` | No-op fallback for non-Zitadel providers |
+| `UserProvisionService` | Provisions the user via `IncomingEventHandler<ProvisionUserInput, UserProvisionResult>` (find-or-create + profile deltas as events), adds `local_userid` claim |
+| `ZitadelUserProvisioner` | Builds provisioning input from `picture`/roles claims, maps Zitadel roles to `mercury.role=Admin` claim |
+| `GeneriUserProvisioner` | Core-claims-only fallback for non-Zitadel providers |
 
 ### Domain Model
 
 **Entities:**
-- `UserEntity` — Internal user record (Id, OidIss, OidSub, Name, Email, ProfilePictureUrl). Unique on (OidIss, OidSub).
 - `StoredEvent` — Abstract base for event sourcing (SequenceId, InsertionTime)
 - `AuctionCreated` — Event: AuctionId, Title, ClosureTime
+- `UserCreated` — Event: UserId, OidIss, OidSub, Name, Email, ProfilePictureUrl, Role. Acts as the identity→user link record; unique per (OidIss, OidSub), enforced by DCB conflict/retry
+- `UserUpdated` — Event: profile deltas keyed on UserId only (Name?, Email?, ProfilePictureUrl?)
+- `UserRoleChanged` — Event: observed role transition keyed on UserId only (`Role?`, null clears)
 
 **Event Sourcing Infrastructure** — [Dynamic Consistency Boundary](events/dynamic-consistency-boundary.md):
 - `OperationHandler.cs` — DCB query language and orchestrator: `EventSelector`/`ConsistencyBoundary`, `IDecisionFunction`/`DecisionStep`, `IncomingEventHandler`
@@ -103,11 +105,8 @@ Custom `WebStatusException` hierarchy (extends `Exception`):
 
 ### Database Schema (PostgreSQL)
 
-**Users (managed via EF migrations):**
-- `Users` — Id (uuid PK), OidIss, OidSub, Name, Email, ProfilePictureUrl
-
 **Event sourcing:**
-- Single `auction_events` table; every event row carries a global `sequence_id` from one shared PostgreSQL sequence
+- Single `app_events` table; every event row carries a global `sequence_id` from one shared PostgreSQL sequence
 - Events are never deleted
 - Scoped reads and the append consistency check predicate over `event_type` and `payload` JSON properties; expression indexes can be added per hot path
 
@@ -173,13 +172,15 @@ User → Protected Route → OIDC Challenge → IdP (Zitadel/Entra/Generic)
                                           Auth code → Token exchange
                                                     ↓
                                           OnTicketReceived fires
-                                                    ↓
+                                                     ↓
                                           UserProvisionService.ProvisionUser()
-                                          ├── Find/create UserEntity by (OidIss, OidSub)
-                                          ├── Update email, name
-                                          ├── Add local_userid claim
-                                          └── Provider-specific: map roles, profile pic
-                                                    ↓
+                                          ├── Provider builds ProvisionUserInput from claims
+                                          ├── UserService resolves identity → userId
+                                          ├── IncomingEventHandler: find-or-create by (OidIss, OidSub),
+                                          │   append UserCreated / UserUpdated / UserRoleChanged deltas
+                                          ├── Add local_userid claim from result
+                                          └── Provider-specific: stamp mercury.role claim
+                                                     ↓
                                           Cookie established → Subsequent requests
 ```
 
@@ -188,7 +189,7 @@ Frontend SSR: `locals.authorize('User' | 'Admin')` verifies session and returns 
 ## Dev Environment
 
 **Nix flake** provides:
-- `dotnet-sdk_10`, `dotnet-ef`, `nodejs_26`, `prettier`, `postgresql_18`, `jq`
+- `dotnet-sdk_10`, `nodejs_26`, `prettier`, `postgresql_18`, `jq`
 - PostgreSQL service (database: `mercury`)
 - `frontend` process: `cd frontend && npm run dev`
 
@@ -206,7 +207,6 @@ cd frontend && npm run openapi-ts # Regenerate API client
 # Backend
 cd backend && dotnet build        # Build
 cd backend && dotnet run --project webshell  # Run backend
-dotnet ef database update         # Apply migrations
 ```
 
 ## Current State

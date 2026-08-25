@@ -1,8 +1,7 @@
 using System.Security.Claims;
-using appcore.Data;
+using appcore.Services;
 using backend.Errors;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 
 namespace backend.Controllers
 {
@@ -11,7 +10,7 @@ namespace backend.Controllers
     /// </summary>
     [Route("api/userinfo")]
     [ApiController]
-    public class UserInfoController(ApplicationDbContext ctx) : ControllerBase
+    public class UserInfoController(UserService users) : ControllerBase
     {
         /// <summary>
         /// An object describing a current user
@@ -60,7 +59,10 @@ namespace backend.Controllers
         public async Task<Me> GetMe()
         {
             var me_claim = User.FindFirstValue("local_userid") ?? throw new ForbidException();
-            var me = await ctx.Users.Where(u => u.Id.ToString() == me_claim).FirstOrDefaultAsync() ?? throw new ForbidException();
+            if (!Guid.TryParse(me_claim, out var userId))
+                throw new ForbidException();
+
+            var me = await users.GetUserById(userId) ?? throw new ForbidException();
 
             var can_start_auctions = User.FindAll("mercury.role").Any(c => c.Value == "Admin");
 
@@ -72,7 +74,8 @@ namespace backend.Controllers
                     Name = me.Name,
                     Email = me.Email,
                     ProfilePictureUrl = me.ProfilePictureUrl,
-                }
+                },
+                CanStartAuctions = can_start_auctions,
             };
         }
 

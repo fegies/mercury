@@ -1,47 +1,31 @@
 using System.Security.Claims;
-using appcore.Data;
-using Microsoft.EntityFrameworkCore;
+using appcore.Infra;
+using appcore.Infra.Evaluators;
+using appcore.Services;
 
-namespace backend.Services
+namespace backend.Services;
+
+internal class UserProvisionService(IncomingEventHandler<ProvisionUserInput, UserProvisionResult> handler, IUserProvisioner provisioner, UserService users)
 {
-    internal class UserProvisionService(ApplicationDbContext context, IUserProvisioner pictureProvisioner)
+    public async Task ProvisionUser(ClaimsPrincipal principal)
     {
-        public async Task ProvisionUser(ClaimsPrincipal principal)
-        {
-            var sub = principal.FindFirst("sub") ?? throw new Exception("sub not found");
-            var name = principal.FindFirst("name") ?? throw new Exception("name not found");
-            var email = principal.FindFirst("email") ?? throw new Exception("email not found");
+        var input = provisioner.BuildInput(principal);
 
-            var user = await context.Users.AsQueryable()
-                .Where(u => u.OidIss == sub.Issuer && u.OidSub == sub.Value)
-                .FirstOrDefaultAsync();
+        var existingUserId = await users.FindUserIdByOidIdentity(input.Issuer, input.Subject);
+        if (existingUserId.HasValue)
+            input = input with { ExistingUserId = existingUserId };
 
-            if (user == null)
-            {
-                user = new()
-                {
-                    OidIss = sub.Issuer,
-                    OidSub = sub.Value,
-                    Name = name.Value,
-                };
-                context.Users.Add(user);
-            }
+        var result = await handler.Execute(input, CancellationToken.None);
 
-            user.Email = email.Value;
-            user.Name = name.Value;
+        // ensure that the local userid claim is not present
+        var previous_id_claims = principal.FindAll("local_userid").ToList();
+        if (previous_id_claims.Count > 0)
+            foreach (var identity in principal.Identities)
+                foreach (var claim in previous_id_claims)
+                    identity.TryRemoveClaim(claim);
 
-            await context.SaveChangesAsync();
+        principal.Identities.First().AddClaim(new Claim("local_userid", result.UserId.ToString()));
 
-            // ensure that the local userid claim is not present
-            var previous_id_claims = principal.FindAll("local_userid").ToList();
-            if (previous_id_claims.Count > 0)
-                foreach (var identity in principal.Identities)
-                    foreach (var claim in previous_id_claims)
-                        identity.TryRemoveClaim(claim);
-
-            principal.Identities.First().AddClaim(new Claim("local_userid", user.Id.ToString()));
-
-            await pictureProvisioner.ProvisionUser(user, principal);
-        }
+        provisioner.ApplyClaims(principal, input);
     }
 }

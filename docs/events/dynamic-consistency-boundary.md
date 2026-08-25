@@ -117,13 +117,13 @@ foreach (property, value) in keys.OrderBy(k => k):
 
 -- 2. Re-evaluate the scope NOW, against everything committed so far.
 --    A matched event with a higher sequence id means the loaded context is stale.
-IF EXISTS (SELECT 1 FROM auction_events
+IF EXISTS (SELECT 1 FROM app_events
            WHERE sequence_id > @last_position
              AND (dnf predicate built from boundary.Selectors))
    → throw ConcurrencyConflictException;  -- rollback
 
 -- 3. Insert the result events and commit (advisory locks released automatically).
-INSERT INTO auction_events (insertion_time, event_type, payload) VALUES ...;
+INSERT INTO app_events (event_type, payload) VALUES ...;  -- insertion_time defaults to now()
 COMMIT;
 ```
 

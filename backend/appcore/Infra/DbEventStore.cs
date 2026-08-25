@@ -1,9 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
-using appcore.Data;
 using appcore.Entities;
-using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using NpgsqlTypes;
 
@@ -13,10 +11,9 @@ public class DbEventStore : IEventStore, IEventReader
 {
 	internal readonly NpgsqlConnection Connection;
 
-	public DbEventStore(ApplicationDbContext context)
+	public DbEventStore(NpgsqlDataSource dataSource)
 	{
-		Connection = context.Database.GetDbConnection() as NpgsqlConnection
-			?? throw new InvalidOperationException("Expected NpgsqlConnection");
+		Connection = dataSource.CreateConnection();
 	}
 
 	public IEventReader Reader => this;
@@ -30,7 +27,7 @@ public class DbEventStore : IEventStore, IEventReader
 		await using var cmd = Connection.CreateCommand();
 		cmd.CommandText = $"""
 			SELECT sequence_id, insertion_time, event_type, payload
-			FROM auction_events
+			FROM app_events
 			WHERE {predicate}
 			ORDER BY sequence_id
 			""";
@@ -101,7 +98,7 @@ public class DbEventStore : IEventStore, IEventReader
 		}
 		var checkCmd = new NpgsqlBatchCommand($"""
 			SELECT EXISTS (
-				SELECT 1 FROM auction_events
+				SELECT 1 FROM app_events
 				WHERE sequence_id > @head AND ({predicate})
 			)
 			""");
@@ -120,7 +117,7 @@ public class DbEventStore : IEventStore, IEventReader
 		if (conflicted)
 			throw new ConcurrencyConflictException();
 
-		// Single roundtrip: insert all result events.
+		// Single roundtrip: insert all result events. insertion_time is assigned by the database (DEFAULT now()).
 		await using var insertBatch = new NpgsqlBatch(Connection)
 		{
 			Transaction = trans,
@@ -128,10 +125,9 @@ public class DbEventStore : IEventStore, IEventReader
 		foreach (var row in serialized)
 		{
 			var insertCmd = new NpgsqlBatchCommand("""
-				INSERT INTO auction_events (insertion_time, event_type, payload)
-				VALUES (@insertion_time, @event_type, @payload::jsonb)
+				INSERT INTO app_events (event_type, payload)
+				VALUES (@event_type, @payload::jsonb)
 				""");
-			insertCmd.Parameters.Add(new NpgsqlParameter("insertion_time", NpgsqlDbType.TimestampTz) { Value = row.InsertionTime });
 			insertCmd.Parameters.Add(new NpgsqlParameter("event_type", NpgsqlDbType.Text) { Value = row.EventType });
 			insertCmd.Parameters.Add(new NpgsqlParameter("payload", NpgsqlDbType.Jsonb) { Value = row.Payload.RootElement.GetRawText() });
 			insertBatch.BatchCommands.Add(insertCmd);

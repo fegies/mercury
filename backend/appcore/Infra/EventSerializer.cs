@@ -23,6 +23,9 @@ public static class EventSerializer
 		["AuctionImagesAdded"] = typeof(AuctionImagesAdded),
 		["AuctionImagesRemoved"] = typeof(AuctionImagesRemoved),
 		["AuctionClosed"] = typeof(AuctionClosed),
+		["UserCreated"] = typeof(UserCreated),
+		["UserUpdated"] = typeof(UserUpdated),
+		["UserRoleChanged"] = typeof(UserRoleChanged),
 	};
 
 	private static readonly Dictionary<Type, string> ReverseTypeMap = TypeMap.ToDictionary(kv => kv.Value, kv => kv.Key);

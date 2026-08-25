@@ -39,7 +39,6 @@
                 prettier
                 postgresql
                 jq
-                dotnet-ef
               ];
 
               languages = {

@@ -8,11 +8,11 @@ using backend.Services;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 
 using appcore;
-using appcore.Data;
+using appcore.Infra;
+using Npgsql;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -132,8 +132,7 @@ app.MapControllers();
 if (IsRealLaunch)
 {
     // this at least looks like a real startup. 
-    using var scope = app.Services.CreateScope();
-    scope.ServiceProvider.GetRequiredService<ApplicationDbContext>().Database.Migrate();
+    await EventStoreSchema.EnsureCreatedAsync(app.Services.GetRequiredService<NpgsqlDataSource>());
 }
 
 app.Run();

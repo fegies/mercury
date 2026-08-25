@@ -4,6 +4,10 @@ export type ClientOptions = {
     baseUrl: `${string}://${string}` | (string & {});
 };
 
+export type IFormFile = Blob | File;
+
+export type IFormFileCollection = Array<IFormFile>;
+
 /**
  * An object describing the current user.
  */
@@ -16,6 +20,13 @@ export type Me = {
      * A boolean detailing if the current user can start and manage auctions
      */
     canStartAuctions?: boolean;
+};
+
+export type UpdateAuctionRequest = {
+    title?: null | string;
+    description?: null | string;
+    minimumPrice?: null | number;
+    closureTime?: null | string;
 };
 
 /**
@@ -38,6 +49,134 @@ export type UserInfo = {
      * Profile picture url
      */
     profilePictureUrl?: null | string;
+};
+
+export type GetApiAuctionsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/auctions';
+};
+
+export type GetApiAuctionsResponses = {
+    /**
+     * OK
+     */
+    200: unknown;
+};
+
+export type PostApiAuctionsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/auctions';
+};
+
+export type PostApiAuctionsResponses = {
+    /**
+     * OK
+     */
+    200: unknown;
+};
+
+export type GetApiAuctionsByIdData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/auctions/{id}';
+};
+
+export type GetApiAuctionsByIdResponses = {
+    /**
+     * OK
+     */
+    200: unknown;
+};
+
+export type PatchApiAuctionsByIdData = {
+    body: UpdateAuctionRequest;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/auctions/{id}';
+};
+
+export type PatchApiAuctionsByIdResponses = {
+    /**
+     * OK
+     */
+    200: unknown;
+};
+
+export type PostApiAuctionsByIdImagesData = {
+    body: {
+        files?: IFormFileCollection;
+    };
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/auctions/{id}/images';
+};
+
+export type PostApiAuctionsByIdImagesResponses = {
+    /**
+     * OK
+     */
+    200: unknown;
+};
+
+export type DeleteApiAuctionsByIdImagesByImageIdData = {
+    body?: never;
+    path: {
+        id: string;
+        imageId: string;
+    };
+    query?: never;
+    url: '/api/auctions/{id}/images/{imageId}';
+};
+
+export type DeleteApiAuctionsByIdImagesByImageIdResponses = {
+    /**
+     * OK
+     */
+    200: unknown;
+};
+
+export type PostApiAuctionsByIdCloseData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/auctions/{id}/close';
+};
+
+export type PostApiAuctionsByIdCloseResponses = {
+    /**
+     * OK
+     */
+    200: unknown;
+};
+
+export type GetApiAuctionsByAuctionIdImagesByImageIdData = {
+    body?: never;
+    path: {
+        auctionId: string;
+        imageId: string;
+    };
+    query?: never;
+    url: '/api/auctions/{auctionId}/images/{imageId}';
+};
+
+export type GetApiAuctionsByAuctionIdImagesByImageIdResponses = {
+    /**
+     * OK
+     */
+    200: unknown;
 };
 
 export type GetApiUserinfoMeData = {

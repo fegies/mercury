@@ -129,8 +129,9 @@ Custom `WebStatusException` hierarchy (extends `Exception`):
 | `/auctions/[id]` | User | Page | Done (detail + images) |
 | `/auctions/[id]/liveticker` | — | SSE stream | Prototype (countdown demo) |
 | `/mybids` | User | Page | WIP (query incomplete) |
-| `/manage-auctions` | Admin | Page | Done (hub with link to create) |
+| `/manage-auctions` | Admin | Page | Done (hub with listing + link to create) |
 | `/manage-auctions/new` | Admin | Page + Form Action | Done (create auction) |
+| `/manage-auctions/[id]` | Admin | Page + Form Actions | Done (edit auction, images, close) |
 | `/logout` | — | GET | Done |
 | `/admin` | Cookie | Page | Done (config panel) |
 | `/admin/login` | — | Page | Done (password form) |

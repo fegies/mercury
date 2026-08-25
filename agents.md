@@ -122,8 +122,7 @@ nix develop     # Enter dev shell
 ## Known Issues / WIP
 
 - Old API classes (`AdminApi`, `UserApi`) were removed; use generated `BackendClient` instead
-- `frontend/src/lib/types/users.ts` — `User` type is missing `export` keyword
 - `default_auction()` in `types/auction.ts` has a bug: `new Date(new Date().getDate() + ...)` should be `new Date().getTime() + ...`
-- Auction/bids/images tables are not EF-managed; schema is only in frontend raw SQL
+- The frontend is stateless: no database access and no server-side session state — pages/actions only proxy the backend API for SSR
 - `nix/backend_package.nix` references Rust tooling — stale/ignore
 - **OpenAPI spec generation:** The `Microsoft.Extensions.ApiDescription.Server` build-time target generates `webshell/openapi/backend.json`, but it may not pick up newly added controllers. After adding a new controller, run `dotnet clean && dotnet build` to force regeneration. If that still doesn't work, start the server and curl `/openapi/v1.json`.

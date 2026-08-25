@@ -21,7 +21,7 @@
 			<!-- <div class="placeholder h-full w-full"></div> -->
 		</div>
 		<div class="row-span-1 flex h-full max-w-full flex-nowrap gap-4 overflow-x-scroll">
-			{#each links as link}
+			{#each links as link (link)}
 				<button class="aspect-square h-auto w-56" onclick={() => (selected = link)}>
 					<img
 						src={link}

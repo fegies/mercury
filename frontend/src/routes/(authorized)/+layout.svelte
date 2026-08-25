@@ -14,7 +14,6 @@
 				<strong class="text-xl uppercase">{data.branding}</strong>
 			</a>
 			<a href="/auctions" class="card p-5">Auctions</a>
-			<a href="/mybids" class="card p-5">My Bids</a>
 			{#if data.me}
 				<a href="/manage-auctions" class="card p-5">Manage Auctions</a>
 			{/if}

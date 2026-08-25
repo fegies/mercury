@@ -28,7 +28,8 @@
 	<span class="h3">{auction.title}</span>
 	<span>{current_bid ?? auction.minimumPrice}€</span>
 	<span
-		>Ends {new Date(auction.closureTime).toLocaleString()} (<DateCountdownBadge expiryDate={new Date(auction.closureTime)}
+		>Ends {new Date(auction.closureTime).toLocaleString()} (<DateCountdownBadge
+			expiryDate={new Date(auction.closureTime)}
 		></DateCountdownBadge>)</span
 	>
 </div>

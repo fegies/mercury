@@ -67,6 +67,7 @@ nix develop     # Enter dev shell
 - **Required properties:** `public required string Name { get; set; }`
 - **Nullable:** Enabled globally
 - **.NET 10** target framework
+- **Favor concrete return types over `IActionResult`:** For endpoints that return a body, the action returns the concrete type (e.g. `Task<AuctionSummary>`) and errors are expressed by throwing exceptions — `InvariantViolation` (→ 400) and `WebStatusException` subclasses (`BadRequestException`, `NotFoundException`, `ForbidException`) are handled by the request-pipeline middleware in `Program.cs`, so controllers need no try/catch around handlers. For no-body responses (`NoContent`), `ActionResult`/`ActionResult<T>` is fine as long as the `[ProducesResponseType(...)]` annotation is present. Always annotate actions with `[ProducesResponseType]` so the OpenAPI spec reflects the concrete schemas and status codes.
 
 ### General
 

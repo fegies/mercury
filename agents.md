@@ -9,6 +9,7 @@ Self-hosted auction platform for organization-internal auctions. SvelteKit front
 ## Important Rules
 
 - **Always create a PR** for any changes made to the codebase. Commit, push to a feature branch, and open a pull request.
+- **Always open PRs against the upstream repo (`fegies/projectMercury`)**, not the `hive` fork. Push your branch to `origin` (the hive fork) but set the PR base repo to `fegies/projectMercury` (head `hive:<branch>`, base `main`).
 - **Always sync from upstream** before starting work. Run `git fetch upstream && git merge upstream/main` on your branch to stay up to date.
 - **No warnings before you are done.** `dotnet build` and `dotnet test` must produce zero warnings. Frontend `npm run check` must produce zero new errors. Fix or suppress all warnings before considering work complete.
 - **Controllers stay slim.** Never construct handlers, event stores, or services manually inside controllers — register them with DI and inject them via the constructor (prefer the two-parameter `AddScoped<Interface, ImplementingType>()` variant). A controller should only parse the request, call injected collaborators, and map results/errors.

@@ -27,11 +27,10 @@ export const actions = {
 		await event.locals.authorize('Admin');
 
 		const formData = await event.request.formData();
-		const errors: string[] = [];
+		const { values, errors: parseErrors } = parse_auction_form(formData);
+		const errors: string[] = [...parseErrors];
 
-		const { values } = parse_auction_form(formData);
-
-		if (values) {
+		if (values && errors.length === 0) {
 			const client = build_client(event);
 			const { error: apiError, response } = await client.patchApiAuctionsById({
 				path: { id: event.params.id },

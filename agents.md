@@ -12,6 +12,7 @@ Self-hosted auction platform for organization-internal auctions. SvelteKit front
 - **Always open PRs against the upstream repo (`fegies/projectMercury`)**, not the `hive` fork. Push your branch to `origin` (the hive fork) but set the PR base repo to `fegies/projectMercury` (head `hive:<branch>`, base `main`).
 - **Always sync from upstream** before starting work. Run `git fetch upstream && git merge upstream/main` on your branch to stay up to date.
 - **No warnings before you are done.** `dotnet build` and `dotnet test` must produce zero warnings. Frontend `npm run check` must produce zero new errors. Fix or suppress all warnings before considering work complete.
+- **Frontend tests must be clean for all PRs.** Run `npm run test` (Vitest) in `frontend/` — all tests must pass. New UI/server-side logic should come with tests where practical (pure helpers in `src/lib/*.test.ts`, SvelteKit form-action/loader tests in `tests/`, never inside `src/routes/` since SvelteKit reserves `+`-prefixed files there).
 - **Controllers stay slim.** Never construct handlers, event stores, or services manually inside controllers — register them with DI and inject them via the constructor (prefer the two-parameter `AddScoped<Interface, ImplementingType>()` variant). A controller should only parse the request, call injected collaborators, and map results/errors.
 
 ## Commands
@@ -24,6 +25,9 @@ npm run build        # Production build
 npm run check        # Type check (svelte-check)
 npm run lint         # Prettier + ESLint
 npm run format       # Auto-format with Prettier
+npm run test         # Unit tests (Vitest)
+npm run test:watch   # Vitest watch mode
+npm run coverage     # Vitest with coverage report
 npm run openapi-ts   # Regenerate API client from backend OpenAPI spec
 ```
 

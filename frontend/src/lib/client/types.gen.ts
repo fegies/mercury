@@ -4,6 +4,21 @@ export type ClientOptions = {
     baseUrl: `${string}://${string}` | (string & {});
 };
 
+export type AuctionSummary = {
+    id?: string;
+    title?: string;
+    description?: string;
+    minimumPrice?: number;
+    closureTime?: string;
+    isClosed?: boolean;
+    imageUrls?: Array<string>;
+    currentBid?: null | number;
+};
+
+export type IFormFile = Blob | File;
+
+export type IFormFileCollection = Array<IFormFile>;
+
 /**
  * An object describing the current user.
  */
@@ -16,6 +31,21 @@ export type Me = {
      * A boolean detailing if the current user can start and manage auctions
      */
     canStartAuctions?: boolean;
+};
+
+export type ProblemDetails = {
+    type?: null | string;
+    title?: null | string;
+    status?: null | number;
+    detail?: null | string;
+    instance?: null | string;
+};
+
+export type UpdateAuctionRequest = {
+    title?: null | string;
+    description?: null | string;
+    minimumPrice?: null | number;
+    closureTime?: null | string;
 };
 
 /**
@@ -38,6 +68,211 @@ export type UserInfo = {
      * Profile picture url
      */
     profilePictureUrl?: null | string;
+};
+
+export type GetApiAuctionsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/auctions';
+};
+
+export type GetApiAuctionsResponses = {
+    /**
+     * OK
+     */
+    200: Array<AuctionSummary>;
+};
+
+export type GetApiAuctionsResponse = GetApiAuctionsResponses[keyof GetApiAuctionsResponses];
+
+export type PostApiAuctionsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/auctions';
+};
+
+export type PostApiAuctionsErrors = {
+    /**
+     * Bad Request
+     */
+    400: ProblemDetails;
+};
+
+export type PostApiAuctionsError = PostApiAuctionsErrors[keyof PostApiAuctionsErrors];
+
+export type PostApiAuctionsResponses = {
+    /**
+     * OK
+     */
+    200: string;
+};
+
+export type PostApiAuctionsResponse = PostApiAuctionsResponses[keyof PostApiAuctionsResponses];
+
+export type GetApiAuctionsByIdData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/auctions/{id}';
+};
+
+export type GetApiAuctionsByIdErrors = {
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type GetApiAuctionsByIdError = GetApiAuctionsByIdErrors[keyof GetApiAuctionsByIdErrors];
+
+export type GetApiAuctionsByIdResponses = {
+    /**
+     * OK
+     */
+    200: AuctionSummary;
+};
+
+export type GetApiAuctionsByIdResponse = GetApiAuctionsByIdResponses[keyof GetApiAuctionsByIdResponses];
+
+export type PatchApiAuctionsByIdData = {
+    body: UpdateAuctionRequest;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/auctions/{id}';
+};
+
+export type PatchApiAuctionsByIdErrors = {
+    /**
+     * Bad Request
+     */
+    400: ProblemDetails;
+};
+
+export type PatchApiAuctionsByIdError = PatchApiAuctionsByIdErrors[keyof PatchApiAuctionsByIdErrors];
+
+export type PatchApiAuctionsByIdResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type PatchApiAuctionsByIdResponse = PatchApiAuctionsByIdResponses[keyof PatchApiAuctionsByIdResponses];
+
+export type PostApiAuctionsByIdImagesData = {
+    body: {
+        files?: IFormFileCollection;
+    };
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/auctions/{id}/images';
+};
+
+export type PostApiAuctionsByIdImagesErrors = {
+    /**
+     * Bad Request
+     */
+    400: ProblemDetails;
+};
+
+export type PostApiAuctionsByIdImagesError = PostApiAuctionsByIdImagesErrors[keyof PostApiAuctionsByIdImagesErrors];
+
+export type PostApiAuctionsByIdImagesResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type PostApiAuctionsByIdImagesResponse = PostApiAuctionsByIdImagesResponses[keyof PostApiAuctionsByIdImagesResponses];
+
+export type DeleteApiAuctionsByIdImagesByImageIdData = {
+    body?: never;
+    path: {
+        id: string;
+        imageId: string;
+    };
+    query?: never;
+    url: '/api/auctions/{id}/images/{imageId}';
+};
+
+export type DeleteApiAuctionsByIdImagesByImageIdErrors = {
+    /**
+     * Bad Request
+     */
+    400: ProblemDetails;
+};
+
+export type DeleteApiAuctionsByIdImagesByImageIdError = DeleteApiAuctionsByIdImagesByImageIdErrors[keyof DeleteApiAuctionsByIdImagesByImageIdErrors];
+
+export type DeleteApiAuctionsByIdImagesByImageIdResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type DeleteApiAuctionsByIdImagesByImageIdResponse = DeleteApiAuctionsByIdImagesByImageIdResponses[keyof DeleteApiAuctionsByIdImagesByImageIdResponses];
+
+export type PostApiAuctionsByIdCloseData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/auctions/{id}/close';
+};
+
+export type PostApiAuctionsByIdCloseErrors = {
+    /**
+     * Bad Request
+     */
+    400: ProblemDetails;
+};
+
+export type PostApiAuctionsByIdCloseError = PostApiAuctionsByIdCloseErrors[keyof PostApiAuctionsByIdCloseErrors];
+
+export type PostApiAuctionsByIdCloseResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type PostApiAuctionsByIdCloseResponse = PostApiAuctionsByIdCloseResponses[keyof PostApiAuctionsByIdCloseResponses];
+
+export type GetApiAuctionsByAuctionIdImagesByImageIdData = {
+    body?: never;
+    path: {
+        auctionId: string;
+        imageId: string;
+    };
+    query?: never;
+    url: '/api/auctions/{auctionId}/images/{imageId}';
+};
+
+export type GetApiAuctionsByAuctionIdImagesByImageIdErrors = {
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type GetApiAuctionsByAuctionIdImagesByImageIdError = GetApiAuctionsByAuctionIdImagesByImageIdErrors[keyof GetApiAuctionsByAuctionIdImagesByImageIdErrors];
+
+export type GetApiAuctionsByAuctionIdImagesByImageIdResponses = {
+    /**
+     * OK
+     */
+    200: unknown;
 };
 
 export type GetApiUserinfoMeData = {

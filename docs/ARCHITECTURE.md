@@ -116,7 +116,6 @@ Custom `WebStatusException` hierarchy (extends `Exception`):
 
 **Route groups:**
 - `(authorized)/` — All protected pages (layout calls `locals.authorize('User')`)
-- `admin/` — Admin config panel (cookie-based auth)
 - `api/` — Server-side API routes
 - `signedout/` — Post-logout page
 
@@ -125,18 +124,16 @@ Custom `WebStatusException` hierarchy (extends `Exception`):
 | Route | Auth | Type | Status |
 |---|---|---|---|
 | `/` → `/auctions` | User | Redirect | Done |
-| `/auctions` | User | Page | WIP (listing commented out) |
+| `/auctions` | User | Page | Done (listing) |
 | `/auctions/[id]` | User | Page | Done (detail + images) |
 | `/auctions/[id]/liveticker` | — | SSE stream | Prototype (countdown demo) |
-| `/mybids` | User | Page | WIP (query incomplete) |
-| `/manage-auctions` | Admin | Page | Done (hub with link to create) |
+| `/manage-auctions` | Admin | Page | Done (hub with listing + link to create) |
 | `/manage-auctions/new` | Admin | Page + Form Action | Done (create auction) |
+| `/manage-auctions/[id]` | Admin | Page + Form Actions | Done (edit auction, images, close) |
 | `/logout` | — | GET | Done |
-| `/admin` | Cookie | Page | Done (config panel) |
-| `/admin/login` | — | Page | Done (password form) |
 | `/signedout` | — | Page | Done |
-| `/api/users/picture/[user_id]` | User | GET | Done (profile pic proxy) |
-| `/auction_images/[image_id]` | User | GET | Done (image proxy with ETag) |
+
+SvelteKit is stateless: no database access, no server-side session state. Pages/actions only proxy the backend API (`locals.authorize()` for auth redirects); all data and files live in the backend.
 
 ### Components
 
@@ -147,9 +144,6 @@ Custom `WebStatusException` hierarchy (extends `Exception`):
 
 **Admin:**
 - `EditableAuction` — Form for creating/editing auctions (multipart/form-data)
-- `OAuthConfigList` — OAuth provider management
-- `OAuthProvider` — Individual OAuth provider form
-- `UserConfiguration` — User role toggle
 
 ### API Client
 
@@ -212,7 +206,5 @@ cd backend && dotnet run --project webshell  # Run backend
 ## Current State
 
 **Active early development.** Known gaps:
-- Old API classes (`AdminApi`, `UserApi`, `OAuthApi`) referenced but removed — migration to generated client in progress
 - Liveticker SSE is a demo prototype
-- Admin panel uses separate cookie-based auth (not OIDC)
 - `nix/backend_package.nix` references `rustPlatform` — leftover from previous Rust backend

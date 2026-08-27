@@ -20,6 +20,6 @@ export function default_auction(): AuctionSummary {
 		closureTime: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
 		isClosed: false,
 		imageUrls: [],
-		currentBid: null,
+		currentBid: null
 	};
 }

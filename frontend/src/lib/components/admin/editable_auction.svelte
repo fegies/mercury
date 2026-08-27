@@ -7,20 +7,26 @@
 	import IconRemove from '@lucide/svelte/icons/circle-x';
 
 	let {
-		model = $bindable()
+		model = $bindable(),
+		submit_label = 'Create Auction',
+		upload_label = 'Images',
+		action = '?'
 	}: {
 		model: AuctionSummary;
+		submit_label?: string;
+		upload_label?: string;
+		action?: string;
 	} = $props();
 </script>
 
-<form method="POST" class="flex flex-col gap-4" enctype="multipart/form-data">
+<form method="POST" {action} class="flex flex-col gap-4" enctype="multipart/form-data">
 	<label class="label">
 		<span class="label-text">Name</span>
 		<input class="input" type="text" name="name" value={model.title} />
 	</label>
 
 	<label class="label">
-		<span class="label-text">Images</span>
+		<span class="label-text">{upload_label}</span>
 		<FileUpload name="images" accept="image/*" classes="w-full" maxFiles={20}>
 			{#snippet iconInterface()}<IconDropzone class="size-8" />{/snippet}
 			{#snippet iconFile()}<IconFile class="size-4" />{/snippet}
@@ -56,5 +62,5 @@
 		/>
 	</label>
 
-	<input type="submit" class="input" value="Create Auction" />
+	<input type="submit" class="btn preset-filled-primary-500 w-fit" value={submit_label} />
 </form>

@@ -12,6 +12,7 @@ using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 
 using appcore;
 using appcore.Infra;
+using appcore.Infra.Evaluators;
 using Npgsql;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -102,13 +103,18 @@ app.Use(async (ctx, next) =>
     }
     catch (WebStatusException e)
     {
-        var res = ctx.Response;
-        res.StatusCode = e.StatusCode;
+        ctx.Response.StatusCode = e.StatusCode;
         if (e.Message != null)
         {
-            Encoding.UTF8.GetBytes(e.Message, res.BodyWriter);
-            await res.BodyWriter.FlushAsync();
+            Encoding.UTF8.GetBytes(e.Message, ctx.Response.BodyWriter);
+            await ctx.Response.BodyWriter.FlushAsync();
         }
+    }
+    catch (InvariantViolation e)
+    {
+        ctx.Response.StatusCode = StatusCodes.Status400BadRequest;
+        Encoding.UTF8.GetBytes(e.Message, ctx.Response.BodyWriter);
+        await ctx.Response.BodyWriter.FlushAsync();
     }
 });
 

@@ -45,9 +45,14 @@ public class AuctionController(
         public string Url { get; init; } = "";
     }
 
+    /// <summary>
+    /// Creates a new auction and returns its id.
+    /// </summary>
     [HttpPost]
     [Authorize(Policy = "IsAdmin")]
-    public async Task<IActionResult> CreateAuction(CancellationToken ct)
+    [ProducesResponseType<Guid>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<Guid> CreateAuction(CancellationToken ct)
     {
         CreateAuctionRequest request;
         List<IFormFile> files;
@@ -68,7 +73,7 @@ public class AuctionController(
         else
         {
             var body = await Request.ReadFromJsonAsync<CreateAuctionRequest>();
-            if (body is null) return BadRequest();
+            if (body is null) throw new BadRequestException("Invalid request body.");
             request = body;
             files = [];
         }
@@ -84,26 +89,24 @@ public class AuctionController(
             ClosureTime = request.ClosureTime,
         };
 
-        try
-        {
-            await createAuctionHandler.Execute(createdEvent, ct);
-        }
-        catch (InvariantViolation ex)
-        {
-            return BadRequest(ex.Message);
-        }
+        await createAuctionHandler.Execute(createdEvent, ct);
 
         if (files.Count > 0)
         {
             await StoreAndAddImages(auctionId, files, ct);
         }
 
-        return Ok(auctionId);
+        return auctionId;
     }
 
+    /// <summary>
+    /// Updates the mutable fields of an auction. Closed auctions cannot be updated.
+    /// </summary>
     [HttpPatch("{id}")]
     [Authorize(Policy = "IsAdmin")]
-    public async Task<IActionResult> UpdateAuction(Guid id, [FromBody] UpdateAuctionRequest request, CancellationToken ct)
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult> UpdateAuction(Guid id, [FromBody] UpdateAuctionRequest request, CancellationToken ct)
     {
         var updatedEvent = new AuctionUpdated
         {
@@ -114,33 +117,36 @@ public class AuctionController(
             ClosureTime = request.ClosureTime,
         };
 
-        try
-        {
-            await updateAuctionHandler.Execute(updatedEvent, ct);
-        }
-        catch (InvariantViolation ex)
-        {
-            return BadRequest(ex.Message);
-        }
+        await updateAuctionHandler.Execute(updatedEvent, ct);
 
-        return Ok();
+        return NoContent();
     }
 
+    /// <summary>
+    /// Adds new images to an existing auction.
+    /// </summary>
     [HttpPost("{id}/images")]
     [Authorize(Policy = "IsAdmin")]
-    public async Task<IActionResult> UploadImages(Guid id, [FromForm] IFormFileCollection files, CancellationToken ct)
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult> UploadImages(Guid id, [FromForm] IFormFileCollection files, CancellationToken ct)
     {
         if (files.Count == 0)
             return BadRequest("No files uploaded.");
 
         await StoreAndAddImages(id, files.ToList(), ct);
 
-        return Ok();
+        return NoContent();
     }
 
+    /// <summary>
+    /// Removes an image from an auction.
+    /// </summary>
     [HttpDelete("{id}/images/{imageId}")]
     [Authorize(Policy = "IsAdmin")]
-    public async Task<IActionResult> RemoveImage(Guid id, Guid imageId, CancellationToken ct)
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult> RemoveImage(Guid id, Guid imageId, CancellationToken ct)
     {
         var removedEvent = new AuctionImagesRemoved
         {
@@ -148,25 +154,23 @@ public class AuctionController(
             ImageIds = [imageId],
         };
 
-        try
-        {
-            await removeImagesHandler.Execute(removedEvent, ct);
-        }
-        catch (InvariantViolation ex)
-        {
-            return BadRequest(ex.Message);
-        }
+        await removeImagesHandler.Execute(removedEvent, ct);
 
         var filePath = Path.Combine(AuctionImagesBasePath, id.ToString(), $"{imageId}.bin");
         if (System.IO.File.Exists(filePath))
             System.IO.File.Delete(filePath);
 
-        return Ok();
+        return NoContent();
     }
 
+    /// <summary>
+    /// Closes an auction permanently.
+    /// </summary>
     [HttpPost("{id}/close")]
     [Authorize(Policy = "IsAdmin")]
-    public async Task<IActionResult> CloseAuction(Guid id, CancellationToken ct)
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult> CloseAuction(Guid id, CancellationToken ct)
     {
         var closedEvent = new AuctionClosed
         {
@@ -174,40 +178,47 @@ public class AuctionController(
             Reason = AuctionCloseReason.Manual,
         };
 
-        try
-        {
-            await closeAuctionHandler.Execute(closedEvent, ct);
-        }
-        catch (InvariantViolation ex)
-        {
-            return BadRequest(ex.Message);
-        }
+        await closeAuctionHandler.Execute(closedEvent, ct);
 
-        return Ok();
+        return NoContent();
     }
 
+    /// <summary>
+    /// Lists all auctions.
+    /// </summary>
     [HttpGet]
     [Authorize]
-    public async Task<IActionResult> ListAuctions(CancellationToken ct)
+    [ProducesResponseType<List<AuctionSummary>>(StatusCodes.Status200OK)]
+    public async Task<List<AuctionSummary>> ListAuctions(CancellationToken ct)
     {
         var auctions = await auctionService.ListAuctionSummaries();
-        return Ok(auctions);
+        return auctions;
     }
 
+    /// <summary>
+    /// Returns a single auction by id.
+    /// </summary>
     [HttpGet("{id}")]
     [Authorize]
-    public async Task<IActionResult> GetAuction(Guid id, CancellationToken ct)
+    [ProducesResponseType<AuctionSummary>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<AuctionSummary> GetAuction(Guid id, CancellationToken ct)
     {
         var summary = await auctionService.GetAuctionSummary(id);
         if (summary is null)
-            return NotFound();
+            throw new NotFoundException();
 
-        return Ok(summary);
+        return summary;
     }
 
+    /// <summary>
+    /// Serves an auction image by id.
+    /// </summary>
     [HttpGet("{auctionId}/images/{imageId}")]
     [Authorize]
-    public async Task<IActionResult> ServeImage(Guid auctionId, Guid imageId)
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult> ServeImage(Guid auctionId, Guid imageId)
     {
         var filePath = Path.Combine(AuctionImagesBasePath, auctionId.ToString(), $"{imageId}.bin");
         if (!System.IO.File.Exists(filePath))
@@ -252,13 +263,6 @@ public class AuctionController(
             Images = imageRefs,
         };
 
-        try
-        {
-            await addImagesHandler.Execute(addedEvent, ct);
-        }
-        catch (InvariantViolation ex)
-        {
-            throw new InvalidOperationException($"Failed to add images: {ex.Message}", ex);
-        }
+        await addImagesHandler.Execute(addedEvent, ct);
     }
 }

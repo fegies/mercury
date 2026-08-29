@@ -40,7 +40,7 @@ public class UserProvisionFlowTests
 		var handler = new IncomingEventHandler<ProvisionUserInput, UserProvisionResult>(store, new ProvisionUserEvaluator(), new EventHandlerOptions());
 
 		var first = await handler.Execute(Input(), CancellationToken.None);
-		var hint = await users.FindUserIdByOidIdentity("https://idp.example.org", "sub-1");
+		var hint = await users.FindUserIdByOidIdentity("https://idp.example.org", "sub-1", CancellationToken.None);
 		Assert.Equal(first.UserId, hint);
 
 		var result = await handler.Execute(Input(existingUserId: hint, name: "Jane Smith", picture: "https://pic"), CancellationToken.None);

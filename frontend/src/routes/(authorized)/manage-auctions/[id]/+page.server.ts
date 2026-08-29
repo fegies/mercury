@@ -6,20 +6,21 @@ import {
 	selected_files,
 	to_auction
 } from '$lib/auction_form';
-import type { AuctionSummary } from '$lib/types/auction.js';
 import type { Actions, PageServerLoad, RequestEvent } from './$types';
 
-export const load: PageServerLoad = async ({ fetch, locals, params }) => {
-	await locals.authorize('Admin');
+export const load: PageServerLoad = async (event) => {
+	await event.locals.authorize('Admin');
 
-	const resp = await fetch(`/api/auctions/${params.id}`);
-	if (!resp.ok) {
-		error(404, 'No such auction found');
+	const client = build_client(event);
+	const { data, error: apiError } = await client.getApiAuctionsById({
+		path: { id: event.params.id }
+	});
+
+	if (apiError) {
+		throw error(404, 'No such auction found');
 	}
 
-	const auction: AuctionSummary = await resp.json();
-
-	return { auction };
+	return { auction: data };
 };
 
 export const actions = {
@@ -64,18 +65,14 @@ export const actions = {
 			return fail(400, { errors: ['No images selected.'] });
 		}
 
-		const body = new FormData();
-		for (const file of files) {
-			body.append('files', file);
-		}
-
-		const resp = await event.fetch(`/api/auctions/${event.params.id}/images`, {
-			method: 'POST',
-			body
+		const client = build_client(event);
+		const { error: apiError, response } = await client.postApiAuctionsByIdImages({
+			path: { id: event.params.id },
+			body: { Files: files }
 		});
 
-		if (!resp.ok) {
-			return fail(400, { errors: [await read_error_message(resp)] });
+		if (apiError) {
+			return fail(400, { errors: [await read_error_message(response)] });
 		}
 
 		return { success: true };

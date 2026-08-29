@@ -7,9 +7,9 @@ namespace backend.Services;
 
 internal class UserProvisionService(IncomingEventHandler<ProvisionUserInput, UserProvisionResult> handler, IUserProvisioner provisioner, UserService users)
 {
-    public async Task ProvisionUser(ClaimsPrincipal principal, CancellationToken ct)
+    public async Task ProvisionUser(ClaimsPrincipal principal, string? accessToken, CancellationToken ct)
     {
-        var input = provisioner.BuildInput(principal);
+        var input = await provisioner.BuildInputAsync(principal, accessToken, ct);
 
         var existingUserId = await users.FindUserIdByOidIdentity(input.Issuer, input.Subject, ct);
         if (existingUserId.HasValue)

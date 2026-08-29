@@ -7,7 +7,7 @@ namespace backend.Services;
 
 class ZitadelUserProvisioner : IUserProvisioner
 {
-    public ProvisionUserInput BuildInput(ClaimsPrincipal principal)
+    public Task<ProvisionUserInput> BuildInputAsync(ClaimsPrincipal principal, string? accessToken, CancellationToken ct)
     {
         var picture = principal.FindFirstValue("picture");
 
@@ -20,11 +20,13 @@ class ZitadelUserProvisioner : IUserProvisioner
                 is_admin = true;
         }
 
-        return ProvisionUserClaims.ReadCore(principal) with
+        var input = ProvisionUserClaims.ReadCore(principal) with
         {
             ProfilePictureUrl = picture,
             Role = is_admin ? "Admin" : null,
         };
+
+        return Task.FromResult(input);
     }
 
     public void ApplyClaims(ClaimsPrincipal principal, ProvisionUserInput input)

@@ -5,6 +5,7 @@ using backend.Auth;
 using backend.Configuration;
 using backend.Errors;
 using backend.Services;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.Authorization;
@@ -28,11 +29,19 @@ builder.RegisterAppcoreServices();
 
 builder.Services.AddSingleton(config);
 builder.Services.AddScoped<UserProvisionService>();
+builder.Services.AddSingleton<IImageStorage, ImageStorageService>();
 
 switch (config.OidcConfig.ProviderType)
 {
     case OidcConfigurationValue.ProviderTypeValue.Zitadel:
         builder.Services.AddScoped<IUserProvisioner, ZitadelUserProvisioner>();
+        break;
+    case OidcConfigurationValue.ProviderTypeValue.Entra:
+        builder.Services.AddHttpClient();
+        builder.Services.AddScoped<IUserProvisioner>(sp => new EntraUserProvisioner(
+            config.EntraConfig,
+            sp.GetRequiredService<IImageStorage>(),
+            sp.GetRequiredService<IHttpClientFactory>()));
         break;
     default:
         builder.Services.AddScoped<IUserProvisioner, GeneriUserProvisioner>();
@@ -67,7 +76,8 @@ builder.Services.AddAuthentication(options =>
 
     options.Events.OnTicketReceived += async (ctx) =>
     {
-        await ctx.HttpContext.RequestServices.GetRequiredService<UserProvisionService>().ProvisionUser(ctx.Principal!, CancellationToken.None);
+        var accessToken = ctx.Properties?.GetTokenValue("access_token");
+        await ctx.HttpContext.RequestServices.GetRequiredService<UserProvisionService>().ProvisionUser(ctx.Principal!, accessToken, CancellationToken.None);
     };
 });
 builder.Services.ConfigureHttpJsonOptions(options =>

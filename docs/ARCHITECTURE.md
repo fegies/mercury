@@ -53,6 +53,8 @@ Startup sequence:
 |---|---|---|---|
 | `OidcController` | `GET /api/logout`, `GET /api/login`, `GET /signedout` | None (hidden from OpenAPI) | OIDC login/logout flow |
 | `UserInfoController` | `GET /api/userinfo/me` | User | Returns current user info + admin flag |
+| `ProfilePictureController` | `GET /api/profilepictures/{id}` | User | Serves locally-stored profile pictures (e.g. Entra photos fetched at login) |
+| `AuctionController` | `GET/POST/PATCH /api/auctions...` | User / Admin | Auction CRUD, image upload/serve/removal |
 
 ### Services
 
@@ -60,7 +62,9 @@ Startup sequence:
 |---|---|
 | `UserProvisionService` | Provisions the user via `IncomingEventHandler<ProvisionUserInput, UserProvisionResult>` (find-or-create + profile deltas as events), adds `local_userid` claim |
 | `ZitadelUserProvisioner` | Builds provisioning input from `picture`/roles claims, maps Zitadel roles to `mercury.role=Admin` claim |
+| `EntraUserProvisioner` | Builds provisioning input for Microsoft Entra ID: maps groups to `mercury.role=Admin`, downloads the profile photo from Microsoft Graph at login (via the access token) and stores it locally through `IImageStorage`, setting `ProfilePictureUrl` to the local `/api/profilepictures/{id}` endpoint |
 | `GeneriUserProvisioner` | Core-claims-only fallback for non-Zitadel providers |
+| `ImageStorageService` | Reusable local-disk file storage (`data/images/`, namespaced by area + id) used by auction images and profile pictures |
 
 ### Domain Model
 
@@ -89,6 +93,8 @@ BackendConfig
 │   ├── ClientId (required)
 │   ├── ClientSecret (required)
 │   └── ProviderType: Zitadel | Entra | Generic
+└── EntraConfig: EntraConfigurationValue
+    └── AdminGroupIds: string[] (Entra group object ids granting Admin)
 ```
 
 ### Authorization

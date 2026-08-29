@@ -1,5 +1,10 @@
 import { describe, expect, it, vi, afterEach } from 'vitest';
-import { parse_auction_form, read_error_message, selected_files, to_auction } from './auction_form';
+import {
+	parse_auction_form,
+	read_error_message,
+	selected_files,
+	to_auction
+} from '../src/lib/auction_form';
 
 function form(entries: Record<string, string | File | undefined>): FormData {
 	const fd = new FormData();

@@ -5,6 +5,7 @@ export type AuctionFormValues = {
 	description: string;
 	minimumPrice: number;
 	closureTime: string;
+	isPublished: boolean;
 };
 
 export function parse_auction_form(formData: FormData): {
@@ -17,7 +18,8 @@ export function parse_auction_form(formData: FormData): {
 		title: form_string('name'),
 		description: form_string('description'),
 		minimumPrice: form_num('min-price'),
-		closureTime: form_date('auction-end')
+		closureTime: form_date('auction-end'),
+		isPublished: form_bool('published')
 	};
 
 	return { values: errors.length == 0 ? values : null, errors };
@@ -50,6 +52,10 @@ export function parse_auction_form(formData: FormData): {
 		}
 
 		return new Date(val).toISOString();
+	}
+
+	function form_bool(name: string): boolean {
+		return formData.get(name) !== null && formData.get(name) !== undefined;
 	}
 }
 

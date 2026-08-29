@@ -10,4 +10,5 @@ public class AuctionCreated : StoredEvent
     public string Description { get; set; } = "";
     public decimal MinimumPrice { get; set; }
     public DateTime ClosureTime { get; set; } = DateTime.MaxValue;
+    public bool? IsPublished { get; set; }
 }

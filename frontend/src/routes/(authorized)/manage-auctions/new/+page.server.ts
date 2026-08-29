@@ -21,6 +21,7 @@ export const actions = {
 					minimumPrice: 0,
 					closureTime: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
 					isClosed: false,
+					isPublished: false,
 					imageUrls: [],
 					currentBid: null
 				};
@@ -36,7 +37,8 @@ export const actions = {
 					title: values.title,
 					description: values.description,
 					minimumPrice: values.minimumPrice,
-					closureTime: values.closureTime
+					closureTime: values.closureTime,
+					isPublished: values.isPublished
 				}
 			});
 

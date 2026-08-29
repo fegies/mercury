@@ -8,6 +8,7 @@ public record AuctionSummary
 	public required decimal MinimumPrice { get; init; }
 	public required DateTime ClosureTime { get; init; }
 	public required bool IsClosed { get; init; }
+	public required bool IsPublished { get; init; }
 	public required List<string> ImageUrls { get; init; }
 	public decimal? CurrentBid { get; init; }
 }

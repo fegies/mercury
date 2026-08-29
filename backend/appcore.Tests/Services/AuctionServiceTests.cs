@@ -9,16 +9,15 @@ namespace appcore.Tests.Services;
 
 public class AuctionServiceTests
 {
-	private static AuctionCreated CreateCreatedEvent(Guid? auctionId = null) => new()
+	private static AuctionCreated CreateCreatedEvent(Guid? auctionId = null, bool? isPublished = null) => new()
 	{
 		AuctionId = auctionId ?? Guid.NewGuid(),
 		Title = "Test Auction",
 		Description = "A description",
 		MinimumPrice = 25.00m,
-		ClosureTime = DateTime.UtcNow.AddDays(14)
-	};
-
-	[Fact]
+		ClosureTime = DateTime.UtcNow.AddDays(14),
+		IsPublished = isPublished
+	};	[Fact]
 	public async Task GetAuctionState_ReturnsEmptyForUnknownId()
 	{
 		var store = new InMemoryEventStore([]);
@@ -45,6 +44,56 @@ public class AuctionServiceTests
 		Assert.Equal(25.00m, state.MinimumPrice);
 		Assert.False(state.IsClosed);
 		Assert.Empty(state.Images);
+		Assert.True(state.IsPublished);
+	}
+
+	[Fact]
+	public async Task GetAuctionState_DefaultsLegacyEventsToPublished()
+	{
+		var auctionId = Guid.NewGuid();
+		var store = new InMemoryEventStore([EventSerializer.Serialize(CreateCreatedEvent(auctionId))]);
+		var service = new AuctionService(store);
+
+		var state = await service.GetAuctionState(auctionId);
+
+		Assert.True(state.IsPublished);
+
+		var summary = await service.GetAuctionSummary(auctionId);
+		Assert.True(summary!.IsPublished);
+	}
+
+	[Fact]
+	public async Task GetAuctionState_HonoursExplicitUnpublishedFlag()
+	{
+		var auctionId = Guid.NewGuid();
+		var created = CreateCreatedEvent(auctionId, isPublished: false);
+		var store = new InMemoryEventStore([EventSerializer.Serialize(created)]);
+		var service = new AuctionService(store);
+
+		var state = await service.GetAuctionState(auctionId);
+
+		Assert.False(state.IsPublished);
+	}
+
+	[Fact]
+	public async Task GetAuctionState_PublishedFlagIncorporatesUpdate()
+	{
+		var auctionId = Guid.NewGuid();
+		var created = CreateCreatedEvent(auctionId, isPublished: false);
+		var updated = new AuctionUpdated
+		{
+			AuctionId = auctionId,
+			IsPublished = true,
+		};
+		var store = new InMemoryEventStore([
+			EventSerializer.Serialize(created),
+			EventSerializer.Serialize(updated),
+		]);
+		var service = new AuctionService(store);
+
+		var state = await service.GetAuctionState(auctionId);
+
+		Assert.True(state.IsPublished);
 	}
 
 	[Fact]

@@ -491,6 +491,7 @@
           "minimumPrice",
           "closureTime",
           "isClosed",
+          "isPublished",
           "imageUrls"
         ],
         "type": "object",
@@ -516,6 +517,9 @@
           "isClosed": {
             "type": "boolean"
           },
+          "isPublished": {
+            "type": "boolean"
+          },
           "imageUrls": {
             "type": "array",
             "items": {
@@ -536,7 +540,8 @@
           "title",
           "description",
           "minimumPrice",
-          "closureTime"
+          "closureTime",
+          "isPublished"
         ],
         "type": "object",
         "properties": {
@@ -553,6 +558,9 @@
           "closureTime": {
             "type": "string",
             "format": "date-time"
+          },
+          "isPublished": {
+            "type": "boolean"
           }
         }
       },
@@ -641,6 +649,12 @@
               "string"
             ],
             "format": "date-time"
+          },
+          "isPublished": {
+            "type": [
+              "null",
+              "boolean"
+            ]
           }
         }
       },

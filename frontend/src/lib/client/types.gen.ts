@@ -11,6 +11,7 @@ export type AuctionSummary = {
     minimumPrice: number;
     closureTime: string;
     isClosed: boolean;
+    isPublished: boolean;
     imageUrls: Array<string>;
     currentBid?: null | number;
 };
@@ -20,6 +21,7 @@ export type CreateAuctionRequest = {
     description: string;
     minimumPrice: number;
     closureTime: string;
+    isPublished: boolean;
 };
 
 export type IFormFile = Blob | File;
@@ -51,6 +53,7 @@ export type UpdateAuctionRequest = {
     description?: null | string;
     minimumPrice?: null | number;
     closureTime?: null | string;
+    isPublished?: null | boolean;
 };
 
 /**

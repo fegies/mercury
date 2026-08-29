@@ -53,5 +53,10 @@
 		/>
 	</label>
 
+	<label class="flex items-center gap-2">
+		<input type="checkbox" class="checkbox" name="published" checked={model.isPublished} />
+		<span class="label-text">Published (visible to non-admin users)</span>
+	</label>
+
 	<input type="submit" class="btn preset-filled-primary-500 w-fit" value={submit_label} />
 </form>

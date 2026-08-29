@@ -1,3 +1,4 @@
+using System.Collections.Specialized;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -7,24 +8,16 @@ using NpgsqlTypes;
 
 namespace appcore.Infra;
 
-public class DbEventStore : IEventStore, IEventReader
+public class DbEventStore(NpgsqlDataSource _datasource) : IEventStore, IEventReader
 {
-	internal readonly NpgsqlConnection Connection;
-
-	public DbEventStore(NpgsqlDataSource dataSource)
-	{
-		Connection = dataSource.CreateConnection();
-	}
 
 	public IEventReader Reader => this;
 
 	public async Task<EventContext> Read(EventSelector[] boundary, CancellationToken ct)
 	{
-		await Connection.OpenAsync(ct);
-
 		var (predicate, parameters) = BuildBoundaryPredicate(boundary);
 
-		await using var cmd = Connection.CreateCommand();
+		await using var cmd = _datasource.CreateCommand();
 		cmd.CommandText = $"""
 			SELECT sequence_id, insertion_time, event_type, payload
 			FROM app_events
@@ -59,8 +52,6 @@ public class DbEventStore : IEventStore, IEventReader
 		if (events.Count == 0)
 			return;
 
-		await Connection.OpenAsync(ct);
-
 		var serialized = new List<AppEvent>(events.Count);
 		var writeKeys = new List<(string Property, string Value)>();
 		foreach (var domainEvent in events)
@@ -81,58 +72,60 @@ public class DbEventStore : IEventStore, IEventReader
 			.ThenBy(k => k.Value, StringComparer.Ordinal)
 			.ToList();
 
-		await using var trans = await Connection.BeginTransactionAsync(System.Data.IsolationLevel.ReadCommitted, ct);
+		await using var conn = _datasource.CreateConnection();
+		await conn.OpenAsync(ct);
+		await using var trans = await conn.BeginTransactionAsync(System.Data.IsolationLevel.ReadCommitted, ct);
 
-		// Single roundtrip: acquire all advisory locks, then re-check the scope as the last batch command.
-		// Locks precede the check so overlapping appends serialize before the scope is re-evaluated (write-skew prevention under READ COMMITTED).
-		var (predicate, parameters) = BuildBoundaryPredicate(boundary.Selectors.ToArray());
-		await using var batch = new NpgsqlBatch(Connection)
 		{
-			Transaction = trans,
-		};
-		foreach (var (property, value) in lockKeys)
-		{
-			var lockCmd = new NpgsqlBatchCommand("SELECT pg_advisory_xact_lock(@key)");
-			lockCmd.Parameters.Add(new NpgsqlParameter("key", NpgsqlDbType.Bigint) { Value = StableHash(property, value) });
-			batch.BatchCommands.Add(lockCmd);
-		}
-		var checkCmd = new NpgsqlBatchCommand($"""
+			// Single roundtrip: acquire all advisory locks, then re-check the scope as the last batch command.
+			// Locks precede the check so overlapping appends serialize before the scope is re-evaluated (write-skew prevention under READ COMMITTED).
+			var (predicate, parameters) = BuildBoundaryPredicate(boundary.Selectors.ToArray());
+			await using var batch = new NpgsqlBatch(conn, trans);
+
+			foreach (var (property, value) in lockKeys)
+			{
+				var lockCmd = new NpgsqlBatchCommand("SELECT pg_advisory_xact_lock(@key)");
+				lockCmd.Parameters.Add(new NpgsqlParameter("key", NpgsqlDbType.Bigint) { Value = StableHash(property, value) });
+				batch.BatchCommands.Add(lockCmd);
+			}
+			var checkCmd = new NpgsqlBatchCommand($"""
 			SELECT EXISTS (
 				SELECT 1 FROM app_events
 				WHERE sequence_id > @head AND ({predicate})
 			)
 			""");
-		checkCmd.Parameters.Add(new NpgsqlParameter("head", NpgsqlDbType.Bigint) { Value = boundary.LastPosition });
-		foreach (var parameter in parameters)
-			checkCmd.Parameters.Add(parameter);
-		batch.BatchCommands.Add(checkCmd);
+			checkCmd.Parameters.Add(new NpgsqlParameter("head", NpgsqlDbType.Bigint) { Value = boundary.LastPosition });
+			foreach (var parameter in parameters)
+				checkCmd.Parameters.Add(parameter);
+			batch.BatchCommands.Add(checkCmd);
 
-		await using var reader = await batch.ExecuteReaderAsync(ct);
-		for (var i = 0; i < lockKeys.Count; i++)
-		{
-			while (await reader.ReadAsync(ct)) { }
-			await reader.NextResultAsync(ct);
+			await using var reader = await batch.ExecuteReaderAsync(ct);
+			for (var i = 0; i < lockKeys.Count; i++)
+			{
+				while (await reader.ReadAsync(ct)) { }
+				await reader.NextResultAsync(ct);
+			}
+			var conflicted = await reader.ReadAsync(ct) && reader.GetBoolean(0);
+			if (conflicted)
+				throw new ConcurrencyConflictException();
 		}
-		var conflicted = await reader.ReadAsync(ct) && reader.GetBoolean(0);
-		if (conflicted)
-			throw new ConcurrencyConflictException();
 
-		// Single roundtrip: insert all result events. insertion_time is assigned by the database (DEFAULT now()).
-		await using var insertBatch = new NpgsqlBatch(Connection)
 		{
-			Transaction = trans,
-		};
-		foreach (var row in serialized)
-		{
-			var insertCmd = new NpgsqlBatchCommand("""
+			// Single roundtrip: insert all result events. insertion_time is assigned by the database (DEFAULT now()).
+			await using var insertBatch = new NpgsqlBatch(conn, trans);
+
+			foreach (var row in serialized)
+			{
+				var insertCmd = new NpgsqlBatchCommand("""
 				INSERT INTO app_events (event_type, payload)
 				VALUES (@event_type, @payload::jsonb)
 				""");
-			insertCmd.Parameters.Add(new NpgsqlParameter("event_type", NpgsqlDbType.Text) { Value = row.EventType });
-			insertCmd.Parameters.Add(new NpgsqlParameter("payload", NpgsqlDbType.Jsonb) { Value = row.Payload.RootElement.GetRawText() });
-			insertBatch.BatchCommands.Add(insertCmd);
+				insertCmd.Parameters.Add(new NpgsqlParameter("event_type", NpgsqlDbType.Text) { Value = row.EventType });
+				insertCmd.Parameters.Add(new NpgsqlParameter("payload", NpgsqlDbType.Jsonb) { Value = row.Payload.RootElement.GetRawText() });
+				insertBatch.BatchCommands.Add(insertCmd);
+			}
+			await insertBatch.ExecuteNonQueryAsync(ct);
 		}
-		await insertBatch.ExecuteNonQueryAsync(ct);
 
 		await trans.CommitAsync(ct);
 	}
@@ -159,8 +152,11 @@ public class DbEventStore : IEventStore, IEventReader
 			foreach (var constraint in selector.Constraints)
 			{
 				var p = $"@p{i}_{ci++}";
-				parameters.Add(new NpgsqlParameter(p, NpgsqlDbType.Text) { Value = constraint.Value });
-				parts.Add($"payload->>{p} = {p}");
+				var pn = p + "_n";
+				var pv = p + "_v";
+				parameters.Add(new NpgsqlParameter(pn, NpgsqlDbType.Text) { Value = constraint.Property });
+				parameters.Add(new NpgsqlParameter(pv, constraint.Value));
+				parts.Add($"payload->>{pn} = {pv}");
 			}
 			disjuncts.Add($"({string.Join(" AND ", parts)})");
 		}

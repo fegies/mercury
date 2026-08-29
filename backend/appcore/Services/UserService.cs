@@ -16,11 +16,11 @@ public class UserService(IEventReader reader)
 		return state.UserId == Guid.Empty ? null : state;
 	}
 
-	public async Task<Guid?> FindUserIdByOidIdentity(string issuer, string subject)
+	public async Task<Guid?> FindUserIdByOidIdentity(string issuer, string subject, CancellationToken ct)
 	{
 		var context = await reader.Read(
 			[EventTypeNames.ForOidIdentity(issuer, subject)],
-			CancellationToken.None);
+			ct);
 		return context.Events
 			.Select(EventSerializer.Deserialize)
 			.OfType<UserCreated>()

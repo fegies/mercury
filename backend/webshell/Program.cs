@@ -67,7 +67,7 @@ builder.Services.AddAuthentication(options =>
 
     options.Events.OnTicketReceived += async (ctx) =>
     {
-        await ctx.HttpContext.RequestServices.GetRequiredService<UserProvisionService>().ProvisionUser(ctx.Principal!);
+        await ctx.HttpContext.RequestServices.GetRequiredService<UserProvisionService>().ProvisionUser(ctx.Principal!, CancellationToken.None);
     };
 });
 builder.Services.ConfigureHttpJsonOptions(options =>

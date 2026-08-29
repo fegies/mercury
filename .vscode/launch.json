@@ -8,7 +8,7 @@
             "name": "C#: backend Debug",
             "type": "dotnet",
             "request": "launch",
-            "projectPath": "${workspaceFolder}/backend/backend.csproj"
+            "projectPath": "${workspaceFolder}/backend/webshell/webshell.csproj"
         },
         {
             "name": ".NET Core Attach",

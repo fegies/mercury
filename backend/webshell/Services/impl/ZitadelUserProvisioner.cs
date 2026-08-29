@@ -15,7 +15,7 @@ class ZitadelUserProvisioner : IUserProvisioner
         var roles_claim = principal.FindFirstValue("urn:zitadel:iam:org:project:roles");
         if (roles_claim != null)
         {
-            var roles_dict = JsonSerializer.Deserialize<Dictionary<string, JsonValue>>(roles_claim);
+            var roles_dict = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(roles_claim);
             if (roles_dict?.ContainsKey("role.admin") == true)
                 is_admin = true;
         }

@@ -29,11 +29,7 @@
 
 <section class="mb-8">
 	<h2 class="h3 mb-3">Details</h2>
-	<EditableAuction
-		bind:model={auction}
-		submit_label="Save Changes"
-		upload_label="Add images"
-		action="?/update"
+	<EditableAuction bind:model={auction} submit_label="Save Changes" action="?/update"
 	></EditableAuction>
 </section>
 

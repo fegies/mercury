@@ -1,20 +1,13 @@
 <script lang="ts">
 	import type { AuctionSummary } from '$lib/types/auction';
-	import { FileUpload } from '@skeletonlabs/skeleton-svelte';
-
-	import IconDropzone from '@lucide/svelte/icons/image-plus';
-	import IconFile from '@lucide/svelte/icons/paperclip';
-	import IconRemove from '@lucide/svelte/icons/circle-x';
 
 	let {
 		model = $bindable(),
 		submit_label = 'Create Auction',
-		upload_label = 'Images',
 		action = '?'
 	}: {
 		model: AuctionSummary;
 		submit_label?: string;
-		upload_label?: string;
 		action?: string;
 	} = $props();
 </script>

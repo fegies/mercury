@@ -1,15 +1,6 @@
-export type AuctionSummary = {
-	id: string;
-	title: string;
-	description: string;
-	minimumPrice: number;
-	closureTime: string;
-	isClosed: boolean;
-	imageUrls: string[];
-	currentBid: number | null;
-};
+import type { AuctionSummary } from '$lib/client/types.gen';
 
-export type AuctionDetail = AuctionSummary;
+export type { AuctionSummary } from '$lib/client/types.gen';
 
 export function default_auction(): AuctionSummary {
 	return {

@@ -1,4 +1,3 @@
-using System.Globalization;
 using System.Security.Cryptography;
 using appcore.Entities;
 using appcore.Entities.Events;
@@ -39,6 +38,11 @@ public class AuctionController(
         public DateTime? ClosureTime { get; init; }
     }
 
+    public record UploadImagesRequest
+    {
+        public List<IFormFile> Files { get; init; } = [];
+    }
+
     public record ImageDto
     {
         public Guid Id { get; init; }
@@ -52,32 +56,8 @@ public class AuctionController(
     [Authorize(Policy = "IsAdmin")]
     [ProducesResponseType<Guid>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    public async Task<Guid> CreateAuction(CancellationToken ct)
+    public async Task<Guid> CreateAuction([FromBody] CreateAuctionRequest request, CancellationToken ct)
     {
-        CreateAuctionRequest request;
-        List<IFormFile> files;
-
-        if (Request.ContentType?.StartsWith("multipart/") == true ||
-            Request.ContentType?.Contains("form") == true)
-        {
-            var form = await Request.ReadFormAsync();
-            request = new CreateAuctionRequest
-            {
-                Title = form["title"].ToString(),
-                Description = form["description"].ToString(),
-                MinimumPrice = decimal.Parse(form["minimumPrice"].ToString(), CultureInfo.InvariantCulture),
-                ClosureTime = DateTime.Parse(form["closureTime"].ToString(), CultureInfo.InvariantCulture),
-            };
-            files = form.Files.ToList();
-        }
-        else
-        {
-            var body = await Request.ReadFromJsonAsync<CreateAuctionRequest>();
-            if (body is null) throw new BadRequestException("Invalid request body.");
-            request = body;
-            files = [];
-        }
-
         var auctionId = Guid.NewGuid();
 
         var createdEvent = new AuctionCreated
@@ -90,11 +70,6 @@ public class AuctionController(
         };
 
         await createAuctionHandler.Execute(createdEvent, ct);
-
-        if (files.Count > 0)
-        {
-            await StoreAndAddImages(auctionId, files, ct);
-        }
 
         return auctionId;
     }
@@ -126,15 +101,16 @@ public class AuctionController(
     /// Adds new images to an existing auction.
     /// </summary>
     [HttpPost("{id}/images")]
+    [Consumes("multipart/form-data")]
     [Authorize(Policy = "IsAdmin")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    public async Task<ActionResult> UploadImages(Guid id, [FromForm] IFormFileCollection files, CancellationToken ct)
+    public async Task<ActionResult> UploadImages(Guid id, [FromForm] UploadImagesRequest request, CancellationToken ct)
     {
-        if (files.Count == 0)
+        if (request.Files.Count == 0)
             return BadRequest("No files uploaded.");
 
-        await StoreAndAddImages(id, files.ToList(), ct);
+        await StoreAndAddImages(id, request.Files, ct);
 
         return NoContent();
     }

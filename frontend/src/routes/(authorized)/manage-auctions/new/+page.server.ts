@@ -1,18 +1,14 @@
 import { fail, redirect } from '@sveltejs/kit';
-import {
-	parse_auction_form,
-	read_error_message,
-	selected_files,
-	to_auction
-} from '$lib/auction_form';
+import { parse_auction_form, read_error_message, to_auction } from '$lib/auction_form';
+import { build_client } from '$lib/api';
 import type { AuctionSummary } from '$lib/types/auction.js';
-import type { Actions } from './$types';
+import type { Actions, RequestEvent } from './$types';
 
 export const actions = {
-	default: async ({ request, fetch, locals }) => {
-		await locals.authorize('Admin');
+	default: async (event: RequestEvent) => {
+		await event.locals.authorize('Admin');
 
-		const formData = await request.formData();
+		const formData = await event.request.formData();
 		const errors: string[] = [];
 
 		const { values } = parse_auction_form(formData);
@@ -30,21 +26,24 @@ export const actions = {
 				};
 
 		if (values) {
-			const body = new FormData();
-			body.set('title', values.title);
-			body.set('description', values.description);
-			body.set('minimumPrice', String(values.minimumPrice));
-			body.set('closureTime', values.closureTime);
-			for (const file of selected_files(formData)) {
-				body.append('files', file);
-			}
+			const client = build_client(event);
+			const {
+				data,
+				error: apiError,
+				response
+			} = await client.postApiAuctions({
+				body: {
+					title: values.title,
+					description: values.description,
+					minimumPrice: values.minimumPrice,
+					closureTime: values.closureTime
+				}
+			});
 
-			const resp = await fetch('/api/auctions', { method: 'POST', body });
-			if (!resp.ok) {
-				errors.push(await read_error_message(resp));
+			if (apiError) {
+				errors.push(await read_error_message(response));
 			} else {
-				const id = await resp.json();
-				redirect(303, `/manage-auctions/${id}`);
+				redirect(303, `/manage-auctions/${data}`);
 			}
 		}
 

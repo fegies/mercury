@@ -5,19 +5,24 @@ export type ClientOptions = {
 };
 
 export type AuctionSummary = {
-    id?: string;
-    title?: string;
-    description?: string;
-    minimumPrice?: number;
-    closureTime?: string;
-    isClosed?: boolean;
-    imageUrls?: Array<string>;
+    id: string;
+    title: string;
+    description: string;
+    minimumPrice: number;
+    closureTime: string;
+    isClosed: boolean;
+    imageUrls: Array<string>;
     currentBid?: null | number;
 };
 
-export type IFormFile = Blob | File;
+export type CreateAuctionRequest = {
+    title: string;
+    description: string;
+    minimumPrice: number;
+    closureTime: string;
+};
 
-export type IFormFileCollection = Array<IFormFile>;
+export type IFormFile = Blob | File;
 
 /**
  * An object describing the current user.
@@ -87,7 +92,7 @@ export type GetApiAuctionsResponses = {
 export type GetApiAuctionsResponse = GetApiAuctionsResponses[keyof GetApiAuctionsResponses];
 
 export type PostApiAuctionsData = {
-    body?: never;
+    body: CreateAuctionRequest;
     path?: never;
     query?: never;
     url: '/api/auctions';
@@ -167,7 +172,7 @@ export type PatchApiAuctionsByIdResponse = PatchApiAuctionsByIdResponses[keyof P
 
 export type PostApiAuctionsByIdImagesData = {
     body: {
-        files?: IFormFileCollection;
+        Files?: Array<IFormFile>;
     };
     path: {
         id: string;

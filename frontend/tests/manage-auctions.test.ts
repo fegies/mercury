@@ -110,23 +110,29 @@ describe('manage-auctions/[id] actions', () => {
 	describe('add_images', () => {
 		it('uploads files and returns success', async () => {
 			const form = new FormData();
-			form.set('images', new File(['data'], 'a.png', { type: 'image/png' }));
+			const file = new File(['data'], 'a.png', { type: 'image/png' });
+			form.set('images', file);
 
-			const fetch = vi.fn().mockResolvedValue(new Response('', { status: 200 }));
-			const result = await actions.add_images(event({ form, fetch }));
+			const upload = vi
+				.fn()
+				.mockResolvedValue({ error: undefined, response: new Response('', { status: 200 }) });
+			make_client({ postApiAuctionsByIdImages: upload });
 
-			expect(fetch).toHaveBeenCalledWith('/api/auctions/auction-1/images', {
-				method: 'POST',
-				body: expect.any(FormData)
+			const result = await actions.add_images(event({ form }));
+
+			expect(upload).toHaveBeenCalledWith({
+				path: { id: 'auction-1' },
+				body: { Files: [file] }
 			});
 			expect(result).toEqual({ success: true });
 		});
 
 		it('rejects when no images are selected', async () => {
-			const fetch = vi.fn();
+			const upload = vi.fn();
+			make_client({ postApiAuctionsByIdImages: upload });
 
-			expect(fetch).not.toHaveBeenCalled();
-			const resultFail = failure(await actions.add_images(event({ form: new FormData(), fetch })));
+			expect(upload).not.toHaveBeenCalled();
+			const resultFail = failure(await actions.add_images(event({ form: new FormData() })));
 			expect(resultFail.status).toBe(400);
 			expect(resultFail.data.errors).toEqual(['No images selected.']);
 		});

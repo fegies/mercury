@@ -11,6 +11,26 @@
           "Auction"
         ],
         "summary": "Creates a new auction and returns its id.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAuctionRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAuctionRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAuctionRequest"
+              }
+            }
+          },
+          "required": true
+        },
         "responses": {
           "200": {
             "description": "OK",
@@ -237,12 +257,15 @@
         ],
         "requestBody": {
           "content": {
-            "application/x-www-form-urlencoded": {
+            "multipart/form-data": {
               "schema": {
                 "type": "object",
                 "properties": {
-                  "files": {
-                    "$ref": "#/components/schemas/IFormFileCollection"
+                  "Files": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/IFormFile"
+                    }
                   }
                 }
               }
@@ -461,6 +484,15 @@
   "components": {
     "schemas": {
       "AuctionSummary": {
+        "required": [
+          "id",
+          "title",
+          "description",
+          "minimumPrice",
+          "closureTime",
+          "isClosed",
+          "imageUrls"
+        ],
         "type": "object",
         "properties": {
           "id": {
@@ -499,15 +531,34 @@
           }
         }
       },
+      "CreateAuctionRequest": {
+        "required": [
+          "title",
+          "description",
+          "minimumPrice",
+          "closureTime"
+        ],
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "minimumPrice": {
+            "type": "number",
+            "format": "double"
+          },
+          "closureTime": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
       "IFormFile": {
         "type": "string",
         "format": "binary"
-      },
-      "IFormFileCollection": {
-        "type": "array",
-        "items": {
-          "$ref": "#/components/schemas/IFormFile"
-        }
       },
       "Me": {
         "required": [

@@ -1,11 +1,11 @@
-import type { AuctionSummary } from '$lib/types/auction.js';
+import { build_client } from '$lib/api';
 import type { PageServerLoad } from './$types';
 
-export const load: PageServerLoad = async ({ fetch, locals }) => {
-	await locals.authorize('User');
+export const load: PageServerLoad = async (event) => {
+	await event.locals.authorize('User');
 
-	const resp = await fetch('/api/auctions');
-	const auctions: AuctionSummary[] = resp.ok ? await resp.json() : [];
+	const client = build_client(event);
+	const { data } = await client.getApiAuctions();
 
-	return { auctions };
+	return { auctions: data ?? [] };
 };

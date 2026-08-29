@@ -203,13 +203,13 @@ public class AuctionController(
     [Authorize]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<ActionResult> ServeImage(Guid auctionId, Guid imageId)
+    public ActionResult ServeImage(Guid auctionId, Guid imageId)
     {
-        var bytes = await imageStorage.ReadAsync(ImageArea, imageId, CancellationToken.None);
-        if (bytes is null)
+        var path = imageStorage.ResolvePath(ImageArea, imageId);
+        if (path is null)
             return NotFound();
 
-        return File(bytes, "application/octet-stream");
+        return PhysicalFile(path, "application/octet-stream");
     }
 
     private bool IsAdmin => User.FindAll("mercury.role").Any(c => c.Value == "Admin");
@@ -226,10 +226,7 @@ public class AuctionController(
             var hash = Convert.ToHexString(hashBytes);
 
             stream.Position = 0;
-            using var memoryStream = new MemoryStream();
-            await stream.CopyToAsync(memoryStream, ct);
-
-            var imageId = await imageStorage.StoreAsync(ImageArea, memoryStream.ToArray(), ct);
+            var imageId = await imageStorage.StoreAsync(ImageArea, stream, ct);
 
             imageRefs.Add(new AuctionImageRef
             {

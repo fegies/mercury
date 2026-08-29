@@ -6,14 +6,14 @@ namespace backend.Services;
 public interface IImageStorage
 {
     /// <summary>
-    /// Stores the given bytes and returns the id under which they can be retrieved.
+    /// Streams the given source to disk and returns the id under which it can be retrieved.
     /// </summary>
-    Task<Guid> StoreAsync(string area, byte[] bytes, CancellationToken ct);
+    Task<Guid> StoreAsync(string area, Stream source, CancellationToken ct);
 
     /// <summary>
-    /// Reads the bytes stored for the given area and id, or null when absent.
+    /// Returns the full on-disk path for the given area and id, or null when absent.
     /// </summary>
-    Task<byte[]?> ReadAsync(string area, Guid id, CancellationToken ct);
+    string? ResolvePath(string area, Guid id);
 
     /// <summary>
     /// Deletes the file for the given area and id, if present.

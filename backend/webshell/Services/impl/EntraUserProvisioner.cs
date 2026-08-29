@@ -48,10 +48,7 @@ class EntraUserProvisioner(EntraConfigurationValue entraConfig, IImageStorage im
         if (!response.IsSuccessStatusCode)
             return null;
 
-        var bytes = await response.Content.ReadAsByteArrayAsync(ct);
-        if (bytes.Length == 0)
-            return null;
-
-        return await imageStorage.StoreAsync(ProfilePictureArea, bytes, ct);
+        await using var stream = await response.Content.ReadAsStreamAsync(ct);
+        return await imageStorage.StoreAsync(ProfilePictureArea, stream, ct);
     }
 }

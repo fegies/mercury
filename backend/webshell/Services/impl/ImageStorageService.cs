@@ -1,25 +1,24 @@
 namespace backend.Services;
 
-class ImageStorageService(
-) : IImageStorage
+class ImageStorageService : IImageStorage
 {
-    private const string BasePath = "data/images";
+    private static readonly string BasePath = Path.GetFullPath("data/images");
 
-    public Task<Guid> StoreAsync(string area, byte[] bytes, CancellationToken ct)
+    public async Task<Guid> StoreAsync(string area, Stream source, CancellationToken ct)
     {
         var id = Guid.NewGuid();
         var filePath = FilePathFor(area, id);
         Directory.CreateDirectory(Path.GetDirectoryName(filePath)!);
-        File.WriteAllBytes(filePath, bytes);
-        return Task.FromResult(id);
+
+        await using var fileStream = File.Create(filePath);
+        await source.CopyToAsync(fileStream, ct);
+        return id;
     }
 
-    public Task<byte[]?> ReadAsync(string area, Guid id, CancellationToken ct)
+    public string? ResolvePath(string area, Guid id)
     {
         var filePath = FilePathFor(area, id);
-        if (!File.Exists(filePath))
-            return Task.FromResult<byte[]?>(null);
-        return Task.FromResult<byte[]?>(File.ReadAllBytes(filePath));
+        return File.Exists(filePath) ? filePath : null;
     }
 
     public Task DeleteAsync(string area, Guid id, CancellationToken ct)

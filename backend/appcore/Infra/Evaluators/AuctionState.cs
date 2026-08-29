@@ -10,6 +10,7 @@ public record AuctionState(
 	decimal MinimumPrice,
 	DateTime ClosureTime,
 	bool IsClosed,
+	bool IsPublished,
 	List<AuctionImageRef> Images
 )
 {
@@ -22,6 +23,7 @@ public record AuctionState(
 			Description = created.Description,
 			MinimumPrice = created.MinimumPrice,
 			ClosureTime = created.ClosureTime,
+			IsPublished = created.IsPublished ?? state.IsPublished,
 		},
 		AuctionUpdated updated => state with
 		{
@@ -29,6 +31,7 @@ public record AuctionState(
 			Description = updated.Description ?? state.Description,
 			MinimumPrice = updated.MinimumPrice ?? state.MinimumPrice,
 			ClosureTime = updated.ClosureTime ?? state.ClosureTime,
+			IsPublished = updated.IsPublished ?? state.IsPublished,
 		},
 		AuctionImagesAdded added => state with
 		{
@@ -52,6 +55,7 @@ public record AuctionState(
 		MinimumPrice: 0m,
 		ClosureTime: DateTime.MaxValue,
 		IsClosed: false,
+		IsPublished: true,
 		Images: []
 	);
 }

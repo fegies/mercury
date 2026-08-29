@@ -28,6 +28,7 @@ public class AuctionController(
         public required string Description { get; init; }
         public required decimal MinimumPrice { get; init; }
         public required DateTime ClosureTime { get; init; }
+        public required bool IsPublished { get; init; }
     }
 
     public record UpdateAuctionRequest
@@ -36,6 +37,7 @@ public class AuctionController(
         public string? Description { get; init; }
         public decimal? MinimumPrice { get; init; }
         public DateTime? ClosureTime { get; init; }
+        public bool? IsPublished { get; init; }
     }
 
     public record UploadImagesRequest
@@ -67,6 +69,7 @@ public class AuctionController(
             Description = request.Description,
             MinimumPrice = request.MinimumPrice,
             ClosureTime = request.ClosureTime,
+            IsPublished = request.IsPublished,
         };
 
         await createAuctionHandler.Execute(createdEvent, ct);
@@ -90,6 +93,7 @@ public class AuctionController(
             Description = request.Description,
             MinimumPrice = request.MinimumPrice,
             ClosureTime = request.ClosureTime,
+            IsPublished = request.IsPublished,
         };
 
         await updateAuctionHandler.Execute(updatedEvent, ct);
@@ -168,6 +172,8 @@ public class AuctionController(
     public async Task<List<AuctionSummary>> ListAuctions(CancellationToken ct)
     {
         var auctions = await auctionService.ListAuctionSummaries();
+        if (!IsAdmin)
+            return auctions.Where(a => a.IsPublished).ToList();
         return auctions;
     }
 
@@ -182,6 +188,9 @@ public class AuctionController(
     {
         var summary = await auctionService.GetAuctionSummary(id);
         if (summary is null)
+            throw new NotFoundException();
+
+        if (!IsAdmin && !summary.IsPublished)
             throw new NotFoundException();
 
         return summary;
@@ -203,6 +212,8 @@ public class AuctionController(
         var bytes = await System.IO.File.ReadAllBytesAsync(filePath);
         return File(bytes, "application/octet-stream");
     }
+
+    private bool IsAdmin => User.FindAll("mercury.role").Any(c => c.Value == "Admin");
 
     private async Task StoreAndAddImages(Guid auctionId, List<IFormFile> files, CancellationToken ct)
     {

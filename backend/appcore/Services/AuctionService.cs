@@ -58,6 +58,7 @@ public class AuctionService(IEventReader reader)
 			MinimumPrice = state.MinimumPrice,
 			ClosureTime = state.ClosureTime,
 			IsClosed = state.IsClosed,
+			IsPublished = state.IsPublished,
 			ImageUrls = state.Images
 				.Select(i => $"/api/auctions/{state.AuctionId}/images/{i.Id}")
 				.ToList(),

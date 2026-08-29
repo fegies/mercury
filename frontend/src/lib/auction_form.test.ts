@@ -19,7 +19,8 @@ describe('parse_auction_form', () => {
 			name: 'My Auction',
 			description: 'A nice item',
 			'min-price': '12.5',
-			'auction-end': '2030-01-01T10:00:00.000Z'
+			'auction-end': '2030-01-01T10:00:00.000Z',
+			published: 'on'
 		});
 
 		const { values, errors } = parse_auction_form(fd);
@@ -29,8 +30,23 @@ describe('parse_auction_form', () => {
 			title: 'My Auction',
 			description: 'A nice item',
 			minimumPrice: 12.5,
-			closureTime: '2030-01-01T10:00:00.000Z'
+			closureTime: '2030-01-01T10:00:00.000Z',
+			isPublished: true
 		});
+	});
+
+	it('treats an unchecked published checkbox as unpublished', () => {
+		const fd = form({
+			name: 'My Auction',
+			description: 'A nice item',
+			'min-price': '1',
+			'auction-end': '2030-01-01T10:00:00.000Z'
+		});
+
+		const { values, errors } = parse_auction_form(fd);
+
+		expect(errors).toEqual([]);
+		expect(values?.isPublished).toBe(false);
 	});
 
 	it('rejects a missing name', () => {
@@ -148,12 +164,14 @@ describe('to_auction', () => {
 			title: 'T',
 			description: 'D',
 			minimumPrice: 5,
-			closureTime: '2030-01-01T00:00:00.000Z'
+			closureTime: '2030-01-01T00:00:00.000Z',
+			isPublished: true
 		});
 
 		expect(auction).toEqual({
 			id: '',
 			isClosed: false,
+			isPublished: true,
 			imageUrls: [],
 			currentBid: null,
 			title: 'T',

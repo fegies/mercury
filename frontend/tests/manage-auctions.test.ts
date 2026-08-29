@@ -47,6 +47,7 @@ describe('manage-auctions/[id] actions', () => {
 			form.set('description', 'New Desc');
 			form.set('min-price', '10');
 			form.set('auction-end', '2030-01-01T10:00:00.000Z');
+			form.set('published', 'on');
 
 			const patch = vi
 				.fn()
@@ -61,7 +62,8 @@ describe('manage-auctions/[id] actions', () => {
 					title: 'New Title',
 					description: 'New Desc',
 					minimumPrice: 10,
-					closureTime: '2030-01-01T10:00:00.000Z'
+					closureTime: '2030-01-01T10:00:00.000Z',
+					isPublished: true
 				}
 			});
 			expect(result).toEqual({ success: true });

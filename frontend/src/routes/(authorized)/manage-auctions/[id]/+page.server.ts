@@ -39,7 +39,8 @@ export const actions = {
 					title: values.title,
 					description: values.description,
 					minimumPrice: values.minimumPrice,
-					closureTime: values.closureTime
+					closureTime: values.closureTime,
+					isPublished: values.isPublished
 				}
 			});
 

@@ -26,15 +26,6 @@
 	</label>
 
 	<label class="label">
-		<span class="label-text">{upload_label}</span>
-		<FileUpload name="images" accept="image/*" classes="w-full" maxFiles={20}>
-			{#snippet iconInterface()}<IconDropzone class="size-8" />{/snippet}
-			{#snippet iconFile()}<IconFile class="size-4" />{/snippet}
-			{#snippet iconFileRemove()}<IconRemove class="size-4" />{/snippet}
-		</FileUpload>
-	</label>
-
-	<label class="label">
 		<span class="label-text">Description</span>
 		<textarea class="textarea" name="description" value={model.description}></textarea>
 	</label>

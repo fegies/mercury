@@ -14,5 +14,6 @@ result
 
 backend/**/obj
 backend/**/bin
+backend/webshell/data
 
 **/core.*

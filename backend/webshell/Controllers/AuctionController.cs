@@ -5,6 +5,7 @@ using appcore.Entities.Events;
 using appcore.Infra;
 using appcore.Infra.Evaluators;
 using appcore.Services;
+using backend.Auth;
 using backend.Errors;
 using backend.Services;
 using Microsoft.AspNetCore.Authorization;
@@ -176,9 +177,9 @@ public class AuctionController(
     [HttpGet]
     [Authorize]
     [ProducesResponseType<List<AuctionSummary>>(StatusCodes.Status200OK)]
-    public async Task<List<AuctionSummary>> ListAuctions(CancellationToken ct)
+    public async Task<List<AuctionSummary>> ListAuctions([FromCurrentUser] Guid currentUserId, CancellationToken ct)
     {
-        var auctions = await auctionService.ListAuctionSummaries(CurrentUserId);
+        var auctions = await auctionService.ListAuctionSummaries(currentUserId);
         if (!IsAdmin)
             return auctions.Where(a => a.IsPublished).ToList();
         return auctions;
@@ -191,9 +192,9 @@ public class AuctionController(
     [Authorize]
     [ProducesResponseType<AuctionSummary>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<AuctionSummary> GetAuction(Guid id, CancellationToken ct)
+    public async Task<AuctionSummary> GetAuction([FromCurrentUser] Guid currentUserId, Guid id, CancellationToken ct)
     {
-        var summary = await auctionService.GetAuctionSummary(id, CurrentUserId);
+        var summary = await auctionService.GetAuctionSummary(id, currentUserId);
         if (summary is null)
             throw new NotFoundException();
 
@@ -211,15 +212,13 @@ public class AuctionController(
     [ProducesResponseType<BidResult>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<BidResult> PlaceBid(Guid id, [FromBody] BidRequest request, CancellationToken ct)
+    public async Task<BidResult> PlaceBid(
+        [FromCurrentUser] Guid currentUserId, Guid id, [FromBody] BidRequest request, CancellationToken ct)
     {
-        var bidderId = CurrentUserId
-            ?? throw new ForbidException();
-
         var bidEvent = new BidPlaced
         {
             AuctionId = id,
-            BidderId = bidderId,
+            BidderId = currentUserId,
             MaximumAmount = request.MaximumAmount,
         };
 
@@ -243,15 +242,6 @@ public class AuctionController(
     }
 
     private bool IsAdmin => User.FindAll("mercury.role").Any(c => c.Value == "Admin");
-
-    private Guid? CurrentUserId
-    {
-        get
-        {
-            var claim = User.FindFirstValue("local_userid");
-            return claim is not null && Guid.TryParse(claim, out var id) ? id : null;
-        }
-    }
 
     private async Task StoreAndAddImages(Guid auctionId, List<IFormFile> files, CancellationToken ct)
     {

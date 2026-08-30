@@ -91,6 +91,14 @@ builder.Services.AddControllers();
 builder.Services.AddOpenApi("backend", options =>
 {
     options.ShouldInclude = (_) => true;
+    options.AddOperationTransformer((operation, _, _) =>
+    {
+        // currentUserId is bound from the authenticated user's claims, not the client.
+        operation.Parameters = operation.Parameters?
+            .Where(p => p.Name != "currentUserId")
+            .ToList();
+        return Task.CompletedTask;
+    });
 });
 
 builder.Services.AddSingleton<IAuthorizationHandler, IsAdminRequirementHandler>();

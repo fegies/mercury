@@ -13,6 +13,10 @@ export function parse_bid_form(formData: FormData): {
 		errors.push('maximum_amount must be present and a number');
 		return { values: null, errors };
 	}
+	if (val <= 0) {
+		errors.push('maximum_amount must be positive');
+		return { values: null, errors };
+	}
 
 	return { values: { maximumAmount: val }, errors };
 }

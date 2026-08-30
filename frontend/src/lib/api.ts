@@ -8,7 +8,7 @@ export function build_client(event: RequestEvent): BackendClient {
 	url.search = '';
 
 	const client = createClient({
-		fetch: event.fetch,
+		fetch: (input, init) => event.fetch(input, { ...init, redirect: 'manual' }),
 		baseUrl: url.toString()
 	});
 	return new BackendClient({

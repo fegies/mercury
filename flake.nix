@@ -71,12 +71,50 @@
         pkgs = nixpkgs.legacyPackages.${system};
       in {
         devenv-up = self.devShells.${system}.default.config.procfileScript;
-        server =
-          pkgs.callPackage (import ./nix/backend_package.nix)
-          {
-            sources = ./backend;
-          };
+
+        # The API backend (ASP.NET Core).
+        server = pkgs.callPackage (import ./nix/backend_package.nix) {
+          sources = ./backend;
+        };
+        # alias matching the rest of the repo
+        backend = self.packages.${system}.server;
+
         frontend = pkgs.callPackage (import ./nix/frontend_package.nix) {sources = ./frontend;};
+
+        # Mock OpenID Connect provider used by the integration tests.
+        oidc-provider-mock = pkgs.callPackage (import ./nix/oidc_mock.nix) {};
+
+        # Regenerates nix/deps.json (nugetDeps for the backend) by restoring the
+        # project with a network-enabled dotnet and converting the restored
+        # packages to nixpkgs' nuget-to-json format. Run OUTSIDE the nix
+        # builder sandbox (which has no network):
+        #   nix run .#gen-deps -- backend/webshell/webshell.csproj nix/deps.json
+        gen-deps = pkgs.writeShellScriptBin "gen-deps" ''
+          set -euo pipefail
+          export PATH=${pkgs.dotnet-sdk_10}/bin:${pkgs.nuget-to-json}/bin:$PATH
+          work=$(mktemp -d)
+          export DOTNET_CLI_HOME="$work/dotnet-home"
+          export NUGET_PACKAGES="$work/restore-pkgs"
+          mkdir -p "$DOTNET_CLI_HOME" "$NUGET_PACKAGES"
+          trap 'rm -rf "$work"' EXIT
+          project=''${1:?usage: gen-deps <csproj> <out.json>}
+          out=''${2:?usage: gen-deps <csproj> <out.json>}
+          dotnet restore "$project" -p:ContinuousIntegrationBuild=true -p:Deterministic=true >&2
+          nuget-to-json "$NUGET_PACKAGES" > "$out"
+        '';
+      });
+
+    tests =
+      forEachSystem
+      (system: let
+        pkgs = nixpkgs.legacyPackages.${system};
+      in {
+        integration = import ./tests/integration.nix {
+          inherit nixpkgs system;
+          backend = self.packages.${system}.server;
+          frontend = self.packages.${system}.frontend;
+          oidc-provider-mock = self.packages.${system}.oidc-provider-mock;
+        };
       });
   };
 }

@@ -59,6 +59,10 @@ builder.Services.AddAuthentication(options =>
 {
     var oidcConf = config.OidcConfig;
     options.Authority = oidcConf.AuthorityUrl;
+    // Metadata over plain HTTP is only acceptable for non-production
+    // authorities (e.g. a local mock IdP); HTTPS is still enforced for
+    // HTTPS authorities.
+    options.RequireHttpsMetadata = !(oidcConf.AuthorityUrl?.StartsWith("http://") ?? false);
     options.ClientId = oidcConf.ClientId;
     options.ClientSecret = oidcConf.ClientSecret;
     options.SignInScheme = CookieAuthenticationDefaults.AuthenticationScheme;
@@ -103,7 +107,7 @@ builder.Services.AddOpenApi("backend", options =>
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
         operation.Parameters = operation.Parameters?
-            .Where(p => !claimBoundParameters.Contains(p.Name))
+            .Where(p => p.Name is null || !claimBoundParameters.Contains(p.Name))
             .ToList();
         return Task.CompletedTask;
     });

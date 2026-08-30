@@ -12,7 +12,16 @@ function build_authorize(event: RequestEvent): (requested_role: string) => Promi
 
 	async function fetch_user(): Promise<Me | undefined> {
 		const client = build_client(event);
+		// API requests do not follow redirects, so an unauthenticated userinfo
+		// request surfaces the login redirect (a non-JSON, non-2xx response) as
+		// a thrown error instead of completing the OAuth flow. As a safety net,
+		// only accept a well-formed Me document; anything else means "not signed
+		// in" so the caller issues the login redirect rather than rendering an
+		// authenticated page.
 		const { data } = await client.getApiUserinfoMe();
+		if (typeof data !== 'object' || data === null || !('userinfo' in data)) {
+			return undefined;
+		}
 		return data;
 	}
 

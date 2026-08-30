@@ -283,6 +283,31 @@ export type GetApiAuctionsByAuctionIdImagesByImageIdResponses = {
     200: unknown;
 };
 
+export type GetApiProfilepicturesByIdData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/profilepictures/{id}';
+};
+
+export type GetApiProfilepicturesByIdErrors = {
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type GetApiProfilepicturesByIdError = GetApiProfilepicturesByIdErrors[keyof GetApiProfilepicturesByIdErrors];
+
+export type GetApiProfilepicturesByIdResponses = {
+    /**
+     * OK
+     */
+    200: unknown;
+};
+
 export type GetApiUserinfoMeData = {
     body?: never;
     path?: never;

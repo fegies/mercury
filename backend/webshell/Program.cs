@@ -28,11 +28,19 @@ builder.RegisterAppcoreServices();
 
 builder.Services.AddSingleton(config);
 builder.Services.AddScoped<UserProvisionService>();
+builder.Services.AddSingleton<IImageStorage, ImageStorageService>();
 
 switch (config.OidcConfig.ProviderType)
 {
     case OidcConfigurationValue.ProviderTypeValue.Zitadel:
         builder.Services.AddScoped<IUserProvisioner, ZitadelUserProvisioner>();
+        break;
+    case OidcConfigurationValue.ProviderTypeValue.Entra:
+        builder.Services.AddHttpClient();
+        builder.Services.AddScoped<IUserProvisioner>(sp => new EntraUserProvisioner(
+            config.EntraConfig,
+            sp.GetRequiredService<IImageStorage>(),
+            sp.GetRequiredService<IHttpClientFactory>()));
         break;
     default:
         builder.Services.AddScoped<IUserProvisioner, GeneriUserProvisioner>();
@@ -65,9 +73,10 @@ builder.Services.AddAuthentication(options =>
     options.TokenValidationParameters.RoleClaimType = "role";
     options.MapInboundClaims = false;
 
-    options.Events.OnTicketReceived += async (ctx) =>
+    options.Events.OnTokenValidated = async (ctx) =>
     {
-        await ctx.HttpContext.RequestServices.GetRequiredService<UserProvisionService>().ProvisionUser(ctx.Principal!, CancellationToken.None);
+        var accessToken = ctx.ProtocolMessage?.AccessToken;
+        await ctx.HttpContext.RequestServices.GetRequiredService<UserProvisionService>().ProvisionUser(ctx.Principal!, accessToken, CancellationToken.None);
     };
 });
 builder.Services.ConfigureHttpJsonOptions(options =>

@@ -5,6 +5,7 @@ using appcore.Infra;
 using appcore.Infra.Evaluators;
 using appcore.Services;
 using backend.Errors;
+using backend.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -18,9 +19,10 @@ public class AuctionController(
     IncomingEventHandler<AuctionUpdated, bool> updateAuctionHandler,
     IncomingEventHandler<AuctionImagesRemoved, bool> removeImagesHandler,
     IncomingEventHandler<AuctionClosed, bool> closeAuctionHandler,
-    IncomingEventHandler<AuctionImagesAdded, bool> addImagesHandler) : ControllerBase
+    IncomingEventHandler<AuctionImagesAdded, bool> addImagesHandler,
+    IImageStorage imageStorage) : ControllerBase
 {
-    private const string AuctionImagesBasePath = "data/auctions";
+    private const string ImageArea = "auctions";
 
     public record CreateAuctionRequest
     {
@@ -136,9 +138,7 @@ public class AuctionController(
 
         await removeImagesHandler.Execute(removedEvent, ct);
 
-        var filePath = Path.Combine(AuctionImagesBasePath, id.ToString(), $"{imageId}.bin");
-        if (System.IO.File.Exists(filePath))
-            System.IO.File.Delete(filePath);
+        await imageStorage.DeleteAsync(ImageArea, imageId, CancellationToken.None);
 
         return NoContent();
     }
@@ -203,43 +203,35 @@ public class AuctionController(
     [Authorize]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<ActionResult> ServeImage(Guid auctionId, Guid imageId)
+    public ActionResult ServeImage(Guid auctionId, Guid imageId)
     {
-        var filePath = Path.Combine(AuctionImagesBasePath, auctionId.ToString(), $"{imageId}.bin");
-        if (!System.IO.File.Exists(filePath))
+        var path = imageStorage.ResolvePath(ImageArea, imageId);
+        if (path is null)
             return NotFound();
 
-        var bytes = await System.IO.File.ReadAllBytesAsync(filePath);
-        return File(bytes, "application/octet-stream");
+        return PhysicalFile(path, "application/octet-stream");
     }
 
     private bool IsAdmin => User.FindAll("mercury.role").Any(c => c.Value == "Admin");
 
     private async Task StoreAndAddImages(Guid auctionId, List<IFormFile> files, CancellationToken ct)
     {
-        var auctionDir = Path.Combine(AuctionImagesBasePath, auctionId.ToString());
-        Directory.CreateDirectory(auctionDir);
-
         var imageRefs = new List<AuctionImageRef>();
 
         foreach (var file in files)
         {
-            var imageId = Guid.NewGuid();
-            var filePath = Path.Combine(auctionDir, $"{imageId}.bin");
-
             await using var stream = file.OpenReadStream();
             using var sha256 = SHA256.Create();
             var hashBytes = await sha256.ComputeHashAsync(stream, ct);
             var hash = Convert.ToHexString(hashBytes);
 
             stream.Position = 0;
-            await using var fileStream = System.IO.File.Create(filePath);
-            await stream.CopyToAsync(fileStream, ct);
+            var imageId = await imageStorage.StoreAsync(ImageArea, stream, ct);
 
             imageRefs.Add(new AuctionImageRef
             {
                 Id = imageId,
-                FilePath = filePath,
+                FilePath = imageId.ToString(),
                 Hash = hash,
             });
         }

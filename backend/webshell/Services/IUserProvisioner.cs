@@ -22,7 +22,7 @@ interface IUserProvisioner
     /// Build the provisioning command for this provider, enriching the core claims
     /// (sub/name/email) with provider-specific profile and role information.
     /// </summary>
-    ProvisionUserInput BuildInput(ClaimsPrincipal principal);
+    Task<ProvisionUserInput> BuildInputAsync(ClaimsPrincipal principal, string? accessToken, CancellationToken ct);
 
     /// <summary>
     /// Stamp provider-specific claims (e.g. mercury.role) onto the authenticated principal.

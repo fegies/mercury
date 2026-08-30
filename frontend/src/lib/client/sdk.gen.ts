@@ -2,7 +2,7 @@
 
 import { type Client, type ClientMeta, formDataBodySerializer, type Options as Options2, type RequestResult, type TDataShape } from './client';
 import { client } from './client.gen';
-import type { DeleteApiAuctionsByIdImagesByImageIdData, DeleteApiAuctionsByIdImagesByImageIdErrors, DeleteApiAuctionsByIdImagesByImageIdResponses, GetApiAuctionsByAuctionIdImagesByImageIdData, GetApiAuctionsByAuctionIdImagesByImageIdErrors, GetApiAuctionsByAuctionIdImagesByImageIdResponses, GetApiAuctionsByIdData, GetApiAuctionsByIdErrors, GetApiAuctionsByIdResponses, GetApiAuctionsData, GetApiAuctionsResponses, GetApiUserinfoMeData, GetApiUserinfoMeResponses, PatchApiAuctionsByIdData, PatchApiAuctionsByIdErrors, PatchApiAuctionsByIdResponses, PostApiAuctionsByIdCloseData, PostApiAuctionsByIdCloseErrors, PostApiAuctionsByIdCloseResponses, PostApiAuctionsByIdImagesData, PostApiAuctionsByIdImagesErrors, PostApiAuctionsByIdImagesResponses, PostApiAuctionsData, PostApiAuctionsErrors, PostApiAuctionsResponses } from './types.gen';
+import type { DeleteApiAuctionsByIdImagesByImageIdData, DeleteApiAuctionsByIdImagesByImageIdErrors, DeleteApiAuctionsByIdImagesByImageIdResponses, GetApiAuctionsByAuctionIdImagesByImageIdData, GetApiAuctionsByAuctionIdImagesByImageIdErrors, GetApiAuctionsByAuctionIdImagesByImageIdResponses, GetApiAuctionsByIdData, GetApiAuctionsByIdErrors, GetApiAuctionsByIdResponses, GetApiAuctionsData, GetApiAuctionsResponses, GetApiProfilepicturesByIdData, GetApiProfilepicturesByIdErrors, GetApiProfilepicturesByIdResponses, GetApiUserinfoMeData, GetApiUserinfoMeResponses, PatchApiAuctionsByIdData, PatchApiAuctionsByIdErrors, PatchApiAuctionsByIdResponses, PostApiAuctionsByIdCloseData, PostApiAuctionsByIdCloseErrors, PostApiAuctionsByIdCloseResponses, PostApiAuctionsByIdImagesData, PostApiAuctionsByIdImagesErrors, PostApiAuctionsByIdImagesResponses, PostApiAuctionsData, PostApiAuctionsErrors, PostApiAuctionsResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -133,6 +133,13 @@ export class BackendClient extends HeyApiClient {
      */
     public getApiAuctionsByAuctionIdImagesByImageId<ThrowOnError extends boolean = false>(options: Options<GetApiAuctionsByAuctionIdImagesByImageIdData, ThrowOnError>): RequestResult<GetApiAuctionsByAuctionIdImagesByImageIdResponses, GetApiAuctionsByAuctionIdImagesByImageIdErrors, ThrowOnError> {
         return (options.client ?? this.client).get<GetApiAuctionsByAuctionIdImagesByImageIdResponses, GetApiAuctionsByAuctionIdImagesByImageIdErrors, ThrowOnError>({ url: '/api/auctions/{auctionId}/images/{imageId}', ...options });
+    }
+    
+    /**
+     * Serves a profile picture by id.
+     */
+    public getApiProfilepicturesById<ThrowOnError extends boolean = false>(options: Options<GetApiProfilepicturesByIdData, ThrowOnError>): RequestResult<GetApiProfilepicturesByIdResponses, GetApiProfilepicturesByIdErrors, ThrowOnError> {
+        return (options.client ?? this.client).get<GetApiProfilepicturesByIdResponses, GetApiProfilepicturesByIdErrors, ThrowOnError>({ url: '/api/profilepictures/{id}', ...options });
     }
     
     /**

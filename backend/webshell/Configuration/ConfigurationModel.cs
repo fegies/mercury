@@ -13,6 +13,11 @@ public class BackendConfig
     /// </summary>
     public OidcConfigurationValue OidcConfig { get; init; } = new();
 
+    /// <summary>
+    /// Microsoft Entra ID provider options
+    /// </summary>
+    public EntraConfigurationValue EntraConfig { get; init; } = new();
+
     internal void Validate()
     {
         var ctx = new ValidationContext(this);

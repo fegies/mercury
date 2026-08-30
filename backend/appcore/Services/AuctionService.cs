@@ -29,11 +29,14 @@ public class AuctionService(IEventReader reader, AuctionConfig auctionConfig)
 
 	public async Task<AuctionSummary?> GetAuctionSummary(Guid id, Guid? viewerId = null)
 	{
-		var state = await GetAuctionState(id);
+		var context = await reader.Read(
+			[EventSelector.ForAuction(id, EventTypeNames.Auction)],
+			CancellationToken.None);
+		var state = AuctionFold.State(context);
 		if (state.AuctionId == Guid.Empty)
 			return null;
 
-		return MapToSummary(state, viewerId);
+		return MapToSummary(state, context, viewerId);
 	}
 
 	public async Task<List<AuctionSummary>> ListAuctionSummaries(Guid? viewerId = null)
@@ -49,17 +52,12 @@ public class AuctionService(IEventReader reader, AuctionConfig auctionConfig)
 		return summaries;
 	}
 
-	public AuctionSummary MapToSummary(AuctionState state, Guid? viewerId = null)
+	public AuctionSummary MapToSummary(AuctionState state, EventContext context, Guid? viewerId = null)
 	{
 		var (highestBidderId, currentPrice) = BidPricing.Compute(state, auctionConfig.MinBidIncrement);
 
-		decimal? myHighest = null;
-		var isHighestBidder = false;
-		if (viewerId.HasValue && state.Maxima.TryGetValue(viewerId.Value, out var maximum))
-		{
-			myHighest = maximum;
-			isHighestBidder = highestBidderId == viewerId.Value;
-		}
+		var myHighest = viewerId.HasValue ? AuctionState.MaxOfBidder(context, viewerId.Value) : null;
+		var isHighestBidder = highestBidderId == viewerId;
 
 		return new AuctionSummary
 		{
@@ -73,7 +71,7 @@ public class AuctionService(IEventReader reader, AuctionConfig auctionConfig)
 			ImageUrls = state.Images
 				.Select(i => $"/api/auctions/{state.AuctionId}/images/{i.Id}")
 				.ToList(),
-			CurrentBid = state.Maxima.Count == 0 ? null : currentPrice,
+			CurrentBid = state.HighestBidderId.HasValue ? currentPrice : null,
 			MyHighest = myHighest,
 			IsHighestBidder = isHighestBidder,
 		};

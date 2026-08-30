@@ -4,11 +4,11 @@ namespace appcore.Infra;
 
 public sealed record EventContext(IReadOnlyList<AppEvent> Events, long Head)
 {
-	public TState Fold<TState>(TState seed, Func<TState, long, StoredEvent, TState> fold)
+	public TState Fold<TState>(TState seed, Func<TState, StoredEvent, TState> fold)
 	{
 		var state = seed;
 		foreach (var row in Events)
-			state = fold(state, row.SequenceId, EventSerializer.Deserialize(row));
+			state = fold(state, EventSerializer.Deserialize(row));
 		return state;
 	}
 }

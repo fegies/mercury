@@ -173,4 +173,46 @@ public class PlaceBidEvaluatorTests
 		var ex = Assert.Throws<InvariantViolation>(() => evaluator.Step(input, TestContext.From()));
 		Assert.Equal("Auction does not exist.", ex.Message);
 	}
+
+	[Fact]
+	public void Step_ThirdBidderRaisesIntoTopTwo_RaisesPrice()
+	{
+		var auctionId = Guid.NewGuid();
+		var a = Guid.NewGuid();
+		var b = Guid.NewGuid();
+		var c = Guid.NewGuid();
+		var evaluator = Evaluator();
+		var input = new BidPlaced { AuctionId = auctionId, BidderId = c, MaximumAmount = 95m };
+
+		var step = evaluator.Step(input, TestContext.From(
+			Auction(auctionId, 1),
+			Bid(auctionId, a, 100m, 2),
+			Bid(auctionId, b, 90m, 3),
+			Bid(auctionId, c, 80m, 4)));
+
+		var result = Assert.IsType<DecisionStep<BidResult>.Complete>(step);
+		Assert.Equal(95.50m, result.Value.CurrentBid);
+		Assert.False(result.Value.IsHighestBidder);
+		Assert.Equal(95m, result.Value.MyHighest);
+	}
+
+	[Fact]
+	public void Step_LeaderRaisesOwnMax_PriceUnchanged()
+	{
+		var auctionId = Guid.NewGuid();
+		var a = Guid.NewGuid();
+		var b = Guid.NewGuid();
+		var evaluator = Evaluator();
+		var input = new BidPlaced { AuctionId = auctionId, BidderId = a, MaximumAmount = 120m };
+
+		var step = evaluator.Step(input, TestContext.From(
+			Auction(auctionId, 1),
+			Bid(auctionId, a, 100m, 2),
+			Bid(auctionId, b, 90m, 3)));
+
+		var result = Assert.IsType<DecisionStep<BidResult>.Complete>(step);
+		Assert.Equal(90.50m, result.Value.CurrentBid);
+		Assert.True(result.Value.IsHighestBidder);
+		Assert.Equal(120m, result.Value.MyHighest);
+	}
 }

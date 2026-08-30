@@ -12,13 +12,15 @@ public record AuctionState(
 	bool IsClosed,
 	bool IsPublished,
 	List<AuctionImageRef> Images,
-	IReadOnlyDictionary<Guid, decimal> Maxima,
-	IReadOnlyDictionary<Guid, long> MaxAtSequence,
+	Guid? HighestBidderId,
+	decimal HighestMax,
+	Guid? SecondBidderId,
+	decimal SecondMax,
 	Guid? WinnerUserId,
 	decimal? WinningPrice
 )
 {
-	public static AuctionState Incorporate(AuctionState state, long sequenceId, StoredEvent e) => e switch
+	public static AuctionState Incorporate(AuctionState state, StoredEvent e) => e switch
 	{
 		AuctionCreated created => state with
 		{
@@ -51,28 +53,65 @@ public record AuctionState(
 			WinnerUserId = closed.WinnerUserId,
 			WinningPrice = closed.WinningPrice,
 		},
-		BidPlaced bid => state with
-		{
-			Maxima = IncorporateMax(state.Maxima, bid.BidderId, bid.MaximumAmount),
-			MaxAtSequence = IncorporateMaxAtSequence(state, bid.BidderId, bid.MaximumAmount, sequenceId),
-		},
+		BidPlaced bid => IncorporateBid(state, bid.BidderId, bid.MaximumAmount),
 		_ => state,
 	};
 
-	private static IReadOnlyDictionary<Guid, decimal> IncorporateMax(
-		IReadOnlyDictionary<Guid, decimal> maxima, Guid bidderId, decimal amount)
+	private static AuctionState IncorporateBid(AuctionState state, Guid bidderId, decimal amount)
 	{
-		if (maxima.TryGetValue(bidderId, out var existing) && existing >= amount)
-			return maxima;
-		return new Dictionary<Guid, decimal>(maxima) { [bidderId] = amount };
+		// Raising the current highest bidder: only their max changes; ranks and price are unchanged.
+		if (state.HighestBidderId == bidderId)
+			return state with { HighestMax = Math.Max(state.HighestMax, amount) };
+
+		// Raising the second-highest bidder: their max may overtake the leader.
+		if (state.SecondBidderId == bidderId)
+		{
+			var newSecond = Math.Max(state.SecondMax, amount);
+			if (newSecond > state.HighestMax)
+			{
+				return state with
+				{
+					SecondBidderId = state.HighestBidderId,
+					SecondMax = state.HighestMax,
+					HighestBidderId = bidderId,
+					HighestMax = newSecond,
+				};
+			}
+			return state with { SecondMax = newSecond };
+		}
+
+		// New or previously lower-ranked bidder.
+		if (amount > state.HighestMax)
+		{
+			return state with
+			{
+				SecondBidderId = state.HighestBidderId,
+				SecondMax = state.HighestMax,
+				HighestBidderId = bidderId,
+				HighestMax = amount,
+			};
+		}
+
+		if (amount > state.SecondMax)
+		{
+			return state with
+			{
+				SecondBidderId = bidderId,
+				SecondMax = amount,
+			};
+		}
+
+		return state;
 	}
 
-	private static IReadOnlyDictionary<Guid, long> IncorporateMaxAtSequence(
-		AuctionState state, Guid bidderId, decimal amount, long sequenceId)
+	/// <summary>
+	/// The highest maximum placed by a single bidder, or null if that bidder has never bid.
+	/// </summary>
+	public static decimal? MaxOfBidder(EventContext context, Guid bidderId)
 	{
-		if (state.Maxima.TryGetValue(bidderId, out var existing) && existing >= amount)
-			return state.MaxAtSequence;
-		return new Dictionary<Guid, long>(state.MaxAtSequence) { [bidderId] = sequenceId };
+		var max = context.Fold(decimal.MinValue, (acc, e) =>
+			e is BidPlaced b && b.BidderId == bidderId ? Math.Max(acc, b.MaximumAmount) : acc);
+		return max == decimal.MinValue ? null : max;
 	}
 
 	public static readonly AuctionState Empty = new(
@@ -84,8 +123,10 @@ public record AuctionState(
 		IsClosed: false,
 		IsPublished: true,
 		Images: [],
-		Maxima: new Dictionary<Guid, decimal>(),
-		MaxAtSequence: new Dictionary<Guid, long>(),
+		HighestBidderId: null,
+		HighestMax: 0m,
+		SecondBidderId: null,
+		SecondMax: 0m,
 		WinnerUserId: null,
 		WinningPrice: null
 	);

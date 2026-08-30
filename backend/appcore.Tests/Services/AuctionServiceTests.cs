@@ -399,4 +399,27 @@ public class AuctionServiceTests
 		Assert.Null(summary.MyHighest);
 		Assert.False(summary.IsHighestBidder);
 	}
+
+	[Fact]
+	public async Task GetAuctionSummary_ThirdPlaceViewer_StillSeesOwnMax()
+	{
+		var auctionId = Guid.NewGuid();
+		var a = Guid.NewGuid();
+		var b = Guid.NewGuid();
+		var me = Guid.NewGuid();
+		var store = new InMemoryEventStore([
+			EventSerializer.Serialize(CreateCreatedEvent(auctionId)) with { SequenceId = 1 },
+			Bid(auctionId, a, 100m, 2),
+			Bid(auctionId, b, 90m, 3),
+			Bid(auctionId, me, 60m, 4),
+		]);
+		var service = new AuctionService(store, new AuctionConfig());
+
+		var summary = await service.GetAuctionSummary(auctionId, me);
+
+		Assert.NotNull(summary);
+		Assert.Equal(90.50m, summary.CurrentBid);
+		Assert.Equal(60m, summary.MyHighest);
+		Assert.False(summary.IsHighestBidder);
+	}
 }

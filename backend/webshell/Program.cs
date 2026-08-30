@@ -45,7 +45,7 @@ switch (config.OidcConfig.ProviderType)
             sp.GetRequiredService<IHttpClientFactory>()));
         break;
     default:
-        builder.Services.AddScoped<IUserProvisioner, GeneriUserProvisioner>();
+        builder.Services.AddScoped<IUserProvisioner, GenericUserProvisioner>();
         break;
 }
 

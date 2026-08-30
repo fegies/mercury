@@ -63,7 +63,7 @@ Startup sequence:
 | `UserProvisionService` | Provisions the user via `IncomingEventHandler<ProvisionUserInput, UserProvisionResult>` (find-or-create + profile deltas as events), adds `local_userid` claim |
 | `ZitadelUserProvisioner` | Builds provisioning input from `picture`/roles claims, maps Zitadel roles to `mercury.role=Admin` claim |
 | `EntraUserProvisioner` | Builds provisioning input for Microsoft Entra ID: maps groups to `mercury.role=Admin`, downloads the profile photo from Microsoft Graph at login (via the access token) and stores it locally through `IImageStorage`, setting `ProfilePictureUrl` to the local `/api/profilepictures/{id}` endpoint |
-| `GeneriUserProvisioner` | Core-claims-only fallback for non-Zitadel providers |
+| `GenericUserProvisioner` | Core-claims-only fallback for non-Zitadel providers |
 | `ImageStorageService` | Reusable local-disk file storage (`data/images/`, namespaced by area + id) used by auction images and profile pictures |
 
 ### Domain Model

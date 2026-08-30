@@ -63,24 +63,9 @@ public record AuctionState(
 		if (state.HighestBidderId == bidderId)
 			return state with { HighestMax = Math.Max(state.HighestMax, amount) };
 
-		// Raising the second-highest bidder: their max may overtake the leader.
-		if (state.SecondBidderId == bidderId)
-		{
-			var newSecond = Math.Max(state.SecondMax, amount);
-			if (newSecond > state.HighestMax)
-			{
-				return state with
-				{
-					SecondBidderId = state.HighestBidderId,
-					SecondMax = state.HighestMax,
-					HighestBidderId = bidderId,
-					HighestMax = newSecond,
-				};
-			}
-			return state with { SecondMax = newSecond };
-		}
-
-		// New or previously lower-ranked bidder.
+		// New, previously lower-ranked, or second-highest bidder. A valid raise of the current
+		// second-highest always exceeds their own max (it must beat the current price), so the
+		// general branches below update them correctly, including an overtake of the leader.
 		if (amount > state.HighestMax)
 		{
 			return state with

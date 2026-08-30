@@ -8,6 +8,7 @@ using backend.Services;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc.Controllers;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 
 using appcore;
@@ -91,11 +92,18 @@ builder.Services.AddControllers();
 builder.Services.AddOpenApi("backend", options =>
 {
     options.ShouldInclude = (_) => true;
-    options.AddOperationTransformer((operation, _, _) =>
+    options.AddOperationTransformer((operation, context, _) =>
     {
-        // currentUserId is bound from the authenticated user's claims, not the client.
+        // Parameters annotated [FromCurrentUser] are bound from the authenticated user's
+        // claims, not the client, so they must not appear in the generated API document.
+        var claimBoundParameters = context.Description.ParameterDescriptions
+            .Where(p => p.ParameterDescriptor is ControllerParameterDescriptor cpd
+                        && cpd.ParameterInfo.IsDefined(typeof(FromCurrentUserAttribute), inherit: false))
+            .Select(p => p.Name)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
         operation.Parameters = operation.Parameters?
-            .Where(p => p.Name != "currentUserId")
+            .Where(p => !claimBoundParameters.Contains(p.Name))
             .ToList();
         return Task.CompletedTask;
     });

@@ -40,7 +40,7 @@ let
   } (builtins.readFile ./integration_test.py);
 
   # Predefined users for the mock IdP. A generic `roles` claim conveys the
-  # admin role (see GeneriUserProvisioner).
+  # admin role (see GenericUserProvisioner).
   oidcUsers = pkgs.writeText "oidc-users.json" (builtins.toJSON [
     {
       sub = "admin";

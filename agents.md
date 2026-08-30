@@ -8,13 +8,11 @@ Self-hosted auction platform for organization-internal auctions. SvelteKit front
 
 ## Important Rules
 
-- **Always create a PR** for any changes made to the codebase. Commit, push to a feature branch, and open a pull request.
-- **Always open PRs against the upstream repo (`fegies/projectMercury`)**, not the `hive` fork. Push your branch to `origin` (the hive fork) but set the PR base repo to `fegies/projectMercury` (head `hive:<branch>`, base `main`).
-- **Always sync from upstream** before starting work. Run `git fetch upstream && git merge upstream/main` on your branch to stay up to date.
+- **Branch, commit, PR.** Create a feature branch, commit changes, push to `origin` (the hive fork), and open a PR against upstream `fegies/projectMercury` (`main` base). Always sync from upstream first: `git fetch upstream && git merge upstream/main`.
 - **No warnings before you are done.** `dotnet build` and `dotnet test` must produce zero warnings. Frontend `npm run check` must produce zero new errors. Fix or suppress all warnings before considering work complete.
 - **Frontend tests must be clean for all PRs.** Run `npm run test` (Vitest) in `frontend/` — all tests must pass. New UI/server-side logic should come with tests where practical (pure helpers in `src/lib/*.test.ts`, SvelteKit form-action/loader tests in `tests/`, never inside `src/routes/` since SvelteKit reserves `+`-prefixed files there).
 - **Controllers stay slim.** Never construct handlers, event stores, or services manually inside controllers — register them with DI and inject them via the constructor (prefer the two-parameter `AddScoped<Interface, ImplementingType>()` variant). A controller should only parse the request, call injected collaborators, and map results/errors.
-- **Configuration is structured and typed.** Never read arbitrary string keys from `IConfiguration` at runtime. All configuration must be bound to a typed config object at startup (via `builder.Configuration.Bind(config)` on `BackendConfig`) and injected through DI. `BackendConfig` aggregates typed sections (e.g. `OidcConfig`, `EntraConfig`); each section is its own `*ConfigurationValue` class. Provider-specific settings must live in a dedicated config class, not be scraped ad-hoc from config.
+- **Configuration is structured and typed.** Never read arbitrary string keys from `IConfiguration` at runtime. All configuration must be bound to a typed config object at startup (via `builder.Configuration.Bind(config)` on `BackendConfig`) and injected through DI. `BackendConfig` aggregates typed sections (`OidcConfig`, `EntraConfig`, `AuctionConfig`); each section is its own `*ConfigurationValue` class. Provider-specific settings must live in a dedicated config class, not be scraped ad-hoc from config.
 
 ## Commands
 
@@ -130,10 +128,7 @@ nix develop     # Enter dev shell
 | Auth/authorization | `backend/webshell/Auth/` |
 | Nix packaging | `nix/` |
 
-## Known Issues / WIP
+## Notes
 
-- Old API classes (`AdminApi`, `UserApi`) were removed; use generated `BackendClient` instead
-- `default_auction()` in `types/auction.ts` has a bug: `new Date(new Date().getDate() + ...)` should be `new Date().getTime() + ...`
 - The frontend is stateless: no database access and no server-side session state — pages/actions only proxy the backend API for SSR
-- `nix/backend_package.nix` references Rust tooling — stale/ignore
-- **OpenAPI spec generation:** The `Microsoft.Extensions.ApiDescription.Server` build-time target generates `webshell/openapi/backend.json`, but it may not pick up newly added controllers. After adding a new controller, run `dotnet clean && dotnet build` to force regeneration. If that still doesn't work, start the server and curl `/openapi/v1.json`.
+- **OpenAPI spec generation:** `dotnet build` generates `webshell/openapi/backend.json` but may miss newly added controllers. Run `dotnet clean && dotnet build` to force regeneration. Fallback: start the server and curl `/openapi/v1.json`.

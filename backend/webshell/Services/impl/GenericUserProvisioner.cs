@@ -4,7 +4,7 @@ using appcore.Infra.Evaluators;
 
 namespace backend.Services;
 
-class GeneriUserProvisioner : IUserProvisioner
+class GenericUserProvisioner : IUserProvisioner
 {
     public Task<ProvisionUserInput> BuildInputAsync(ClaimsPrincipal principal, string? accessToken, CancellationToken ct)
     {

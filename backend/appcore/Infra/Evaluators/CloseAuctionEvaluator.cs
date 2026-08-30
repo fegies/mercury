@@ -1,8 +1,9 @@
+using appcore.Configuration;
 using appcore.Entities.Events;
 
 namespace appcore.Infra.Evaluators;
 
-public class CloseAuctionEvaluator : IDecisionFunction<AuctionClosed, bool>
+public class CloseAuctionEvaluator(AuctionConfig auctionConfig) : IDecisionFunction<AuctionClosed, bool>
 {
 	public EventSelector InitialSelector(AuctionClosed input)
 		=> EventSelector.ForAuction(input.AuctionId, EventTypeNames.Auction);
@@ -16,6 +17,11 @@ public class CloseAuctionEvaluator : IDecisionFunction<AuctionClosed, bool>
 
 		if (state.IsClosed)
 			throw new InvariantViolation("Auction is already closed.");
+
+		var (highestBidderId, currentPrice) = BidPricing.Compute(state, auctionConfig.MinBidIncrement);
+
+		input.WinnerUserId = highestBidderId;
+		input.WinningPrice = highestBidderId.HasValue ? currentPrice : null;
 
 		return new DecisionStep<bool>.Complete(true, [input]);
 	}

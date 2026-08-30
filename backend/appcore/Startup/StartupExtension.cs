@@ -1,3 +1,4 @@
+using appcore.Configuration;
 using appcore.Entities.Events;
 using appcore.Infra;
 using appcore.Infra.Evaluators;
@@ -23,8 +24,11 @@ public static class StartupExtension
         builder.Services.AddScoped<IDecisionFunction<AuctionCreated, Guid>, CreateAuctionEvaluator>();
         builder.Services.AddScoped<IDecisionFunction<AuctionUpdated, bool>, UpdateAuctionEvaluator>();
         builder.Services.AddScoped<IDecisionFunction<AuctionImagesRemoved, bool>, RemoveImagesEvaluator>();
-        builder.Services.AddScoped<IDecisionFunction<AuctionClosed, bool>, CloseAuctionEvaluator>();
+        builder.Services.AddScoped<IDecisionFunction<AuctionClosed, bool>, CloseAuctionEvaluator>(sp =>
+            new CloseAuctionEvaluator(sp.GetRequiredService<AuctionConfig>()));
         builder.Services.AddScoped<IDecisionFunction<AuctionImagesAdded, bool>, AddImagesEvaluator>();
+        builder.Services.AddScoped<IDecisionFunction<BidPlaced, BidResult>, PlaceBidEvaluator>(sp =>
+            new PlaceBidEvaluator(sp.GetRequiredService<AuctionConfig>().MinBidIncrement));
         builder.Services.AddScoped<IDecisionFunction<ProvisionUserInput, UserProvisionResult>, ProvisionUserEvaluator>();
 
         builder.Services.AddScoped<IncomingEventHandler<AuctionCreated, Guid>>();
@@ -32,6 +36,7 @@ public static class StartupExtension
         builder.Services.AddScoped<IncomingEventHandler<AuctionImagesRemoved, bool>>();
         builder.Services.AddScoped<IncomingEventHandler<AuctionClosed, bool>>();
         builder.Services.AddScoped<IncomingEventHandler<AuctionImagesAdded, bool>>();
+        builder.Services.AddScoped<IncomingEventHandler<BidPlaced, BidResult>>();
         builder.Services.AddScoped<IncomingEventHandler<ProvisionUserInput, UserProvisionResult>>();
     }
 }

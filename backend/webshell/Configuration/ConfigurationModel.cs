@@ -1,5 +1,6 @@
 using System;
 using System.ComponentModel.DataAnnotations;
+using appcore.Configuration;
 
 namespace backend.Configuration;
 
@@ -17,6 +18,11 @@ public class BackendConfig
     /// Microsoft Entra ID provider options
     /// </summary>
     public EntraConfigurationValue EntraConfig { get; init; } = new();
+
+    /// <summary>
+    /// Auction domain options
+    /// </summary>
+    public AuctionConfig AuctionConfig { get; init; } = new();
 
     internal void Validate()
     {

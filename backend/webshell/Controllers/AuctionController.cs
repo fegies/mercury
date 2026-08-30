@@ -1,9 +1,11 @@
+using System.Security.Claims;
 using System.Security.Cryptography;
 using appcore.Entities;
 using appcore.Entities.Events;
 using appcore.Infra;
 using appcore.Infra.Evaluators;
 using appcore.Services;
+using backend.Auth;
 using backend.Errors;
 using backend.Services;
 using Microsoft.AspNetCore.Authorization;
@@ -20,6 +22,7 @@ public class AuctionController(
     IncomingEventHandler<AuctionImagesRemoved, bool> removeImagesHandler,
     IncomingEventHandler<AuctionClosed, bool> closeAuctionHandler,
     IncomingEventHandler<AuctionImagesAdded, bool> addImagesHandler,
+    IncomingEventHandler<BidPlaced, BidResult> placeBidHandler,
     IImageStorage imageStorage) : ControllerBase
 {
     private const string ImageArea = "auctions";
@@ -31,6 +34,11 @@ public class AuctionController(
         public required decimal MinimumPrice { get; init; }
         public required DateTime ClosureTime { get; init; }
         public required bool IsPublished { get; init; }
+    }
+
+    public record BidRequest
+    {
+        public required decimal MaximumAmount { get; init; }
     }
 
     public record UpdateAuctionRequest
@@ -169,9 +177,9 @@ public class AuctionController(
     [HttpGet]
     [Authorize]
     [ProducesResponseType<List<AuctionSummary>>(StatusCodes.Status200OK)]
-    public async Task<List<AuctionSummary>> ListAuctions(CancellationToken ct)
+    public async Task<List<AuctionSummary>> ListAuctions([FromCurrentUser] Guid currentUserId, CancellationToken ct)
     {
-        var auctions = await auctionService.ListAuctionSummaries();
+        var auctions = await auctionService.ListAuctionSummaries(currentUserId);
         if (!IsAdmin)
             return auctions.Where(a => a.IsPublished).ToList();
         return auctions;
@@ -184,9 +192,9 @@ public class AuctionController(
     [Authorize]
     [ProducesResponseType<AuctionSummary>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<AuctionSummary> GetAuction(Guid id, CancellationToken ct)
+    public async Task<AuctionSummary> GetAuction([FromCurrentUser] Guid currentUserId, Guid id, CancellationToken ct)
     {
-        var summary = await auctionService.GetAuctionSummary(id);
+        var summary = await auctionService.GetAuctionSummary(id, currentUserId);
         if (summary is null)
             throw new NotFoundException();
 
@@ -194,6 +202,27 @@ public class AuctionController(
             throw new NotFoundException();
 
         return summary;
+    }
+
+    /// <summary>
+    /// Places a maximum bid on an auction and returns the resulting bid state.
+    /// </summary>
+    [HttpPost("{id}/bid")]
+    [Authorize]
+    [ProducesResponseType<BidResult>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<BidResult> PlaceBid(
+        [FromCurrentUser] Guid currentUserId, Guid id, [FromBody] BidRequest request, CancellationToken ct)
+    {
+        var bidEvent = new BidPlaced
+        {
+            AuctionId = id,
+            BidderId = currentUserId,
+            MaximumAmount = request.MaximumAmount,
+        };
+
+        return await placeBidHandler.Execute(bidEvent, ct);
     }
 
     /// <summary>

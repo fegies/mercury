@@ -11,4 +11,6 @@ public record AuctionSummary
 	public required bool IsPublished { get; init; }
 	public required List<string> ImageUrls { get; init; }
 	public decimal? CurrentBid { get; init; }
+	public decimal? MyHighest { get; init; }
+	public bool IsHighestBidder { get; init; }
 }

@@ -11,7 +11,13 @@ public record AuctionState(
 	DateTime ClosureTime,
 	bool IsClosed,
 	bool IsPublished,
-	List<AuctionImageRef> Images
+	List<AuctionImageRef> Images,
+	Guid? HighestBidderId,
+	decimal HighestMax,
+	Guid? SecondBidderId,
+	decimal SecondMax,
+	Guid? WinnerUserId,
+	decimal? WinningPrice
 )
 {
 	public static AuctionState Incorporate(AuctionState state, StoredEvent e) => e switch
@@ -41,12 +47,57 @@ public record AuctionState(
 		{
 			Images = state.Images.Where(i => !removed.ImageIds.Contains(i.Id)).ToList(),
 		},
-		AuctionClosed => state with
+		AuctionClosed closed => state with
 		{
 			IsClosed = true,
+			WinnerUserId = closed.WinnerUserId,
+			WinningPrice = closed.WinningPrice,
 		},
+		BidPlaced bid => IncorporateBid(state, bid.BidderId, bid.MaximumAmount),
 		_ => state,
 	};
+
+	private static AuctionState IncorporateBid(AuctionState state, Guid bidderId, decimal amount)
+	{
+		// Raising the current highest bidder: only their max changes; ranks and price are unchanged.
+		if (state.HighestBidderId == bidderId)
+			return state with { HighestMax = Math.Max(state.HighestMax, amount) };
+
+		// New, previously lower-ranked, or second-highest bidder. A valid raise of the current
+		// second-highest always exceeds their own max (it must beat the current price), so the
+		// general branches below update them correctly, including an overtake of the leader.
+		if (amount > state.HighestMax)
+		{
+			return state with
+			{
+				SecondBidderId = state.HighestBidderId,
+				SecondMax = state.HighestMax,
+				HighestBidderId = bidderId,
+				HighestMax = amount,
+			};
+		}
+
+		if (amount > state.SecondMax)
+		{
+			return state with
+			{
+				SecondBidderId = bidderId,
+				SecondMax = amount,
+			};
+		}
+
+		return state;
+	}
+
+	/// <summary>
+	/// The highest maximum placed by a single bidder, or null if that bidder has never bid.
+	/// </summary>
+	public static decimal? MaxOfBidder(EventContext context, Guid bidderId)
+	{
+		var max = context.Fold(decimal.MinValue, (acc, e) =>
+			e is BidPlaced b && b.BidderId == bidderId ? Math.Max(acc, b.MaximumAmount) : acc);
+		return max == decimal.MinValue ? null : max;
+	}
 
 	public static readonly AuctionState Empty = new(
 		AuctionId: Guid.Empty,
@@ -56,7 +107,13 @@ public record AuctionState(
 		ClosureTime: DateTime.MaxValue,
 		IsClosed: false,
 		IsPublished: true,
-		Images: []
+		Images: [],
+		HighestBidderId: null,
+		HighestMax: 0m,
+		SecondBidderId: null,
+		SecondMax: 0m,
+		WinnerUserId: null,
+		WinningPrice: null
 	);
 }
 

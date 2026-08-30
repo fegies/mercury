@@ -2,7 +2,7 @@
 
 import { type Client, type ClientMeta, formDataBodySerializer, type Options as Options2, type RequestResult, type TDataShape } from './client';
 import { client } from './client.gen';
-import type { DeleteApiAuctionsByIdImagesByImageIdData, DeleteApiAuctionsByIdImagesByImageIdErrors, DeleteApiAuctionsByIdImagesByImageIdResponses, GetApiAuctionsByAuctionIdImagesByImageIdData, GetApiAuctionsByAuctionIdImagesByImageIdErrors, GetApiAuctionsByAuctionIdImagesByImageIdResponses, GetApiAuctionsByIdData, GetApiAuctionsByIdErrors, GetApiAuctionsByIdResponses, GetApiAuctionsData, GetApiAuctionsResponses, GetApiProfilepicturesByIdData, GetApiProfilepicturesByIdErrors, GetApiProfilepicturesByIdResponses, GetApiUserinfoMeData, GetApiUserinfoMeResponses, PatchApiAuctionsByIdData, PatchApiAuctionsByIdErrors, PatchApiAuctionsByIdResponses, PostApiAuctionsByIdCloseData, PostApiAuctionsByIdCloseErrors, PostApiAuctionsByIdCloseResponses, PostApiAuctionsByIdImagesData, PostApiAuctionsByIdImagesErrors, PostApiAuctionsByIdImagesResponses, PostApiAuctionsData, PostApiAuctionsErrors, PostApiAuctionsResponses } from './types.gen';
+import type { DeleteApiAuctionsByIdImagesByImageIdData, DeleteApiAuctionsByIdImagesByImageIdErrors, DeleteApiAuctionsByIdImagesByImageIdResponses, GetApiAuctionsByAuctionIdImagesByImageIdData, GetApiAuctionsByAuctionIdImagesByImageIdErrors, GetApiAuctionsByAuctionIdImagesByImageIdResponses, GetApiAuctionsByIdData, GetApiAuctionsByIdErrors, GetApiAuctionsByIdResponses, GetApiAuctionsData, GetApiAuctionsResponses, GetApiProfilepicturesByIdData, GetApiProfilepicturesByIdErrors, GetApiProfilepicturesByIdResponses, GetApiUserinfoMeData, GetApiUserinfoMeResponses, PatchApiAuctionsByIdData, PatchApiAuctionsByIdErrors, PatchApiAuctionsByIdResponses, PostApiAuctionsByIdBidData, PostApiAuctionsByIdBidErrors, PostApiAuctionsByIdBidResponses, PostApiAuctionsByIdCloseData, PostApiAuctionsByIdCloseErrors, PostApiAuctionsByIdCloseResponses, PostApiAuctionsByIdImagesData, PostApiAuctionsByIdImagesErrors, PostApiAuctionsByIdImagesResponses, PostApiAuctionsData, PostApiAuctionsErrors, PostApiAuctionsResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -126,6 +126,20 @@ export class BackendClient extends HeyApiClient {
      */
     public postApiAuctionsByIdClose<ThrowOnError extends boolean = false>(options: Options<PostApiAuctionsByIdCloseData, ThrowOnError>): RequestResult<PostApiAuctionsByIdCloseResponses, PostApiAuctionsByIdCloseErrors, ThrowOnError> {
         return (options.client ?? this.client).post<PostApiAuctionsByIdCloseResponses, PostApiAuctionsByIdCloseErrors, ThrowOnError>({ url: '/api/auctions/{id}/close', ...options });
+    }
+    
+    /**
+     * Places a maximum bid on an auction and returns the resulting bid state.
+     */
+    public postApiAuctionsByIdBid<ThrowOnError extends boolean = false>(options: Options<PostApiAuctionsByIdBidData, ThrowOnError>): RequestResult<PostApiAuctionsByIdBidResponses, PostApiAuctionsByIdBidErrors, ThrowOnError> {
+        return (options.client ?? this.client).post<PostApiAuctionsByIdBidResponses, PostApiAuctionsByIdBidErrors, ThrowOnError>({
+            url: '/api/auctions/{id}/bid',
+            ...options,
+            headers: {
+                'Content-Type': 'application/json',
+                ...options.headers
+            }
+        });
     }
     
     /**

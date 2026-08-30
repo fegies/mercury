@@ -1,3 +1,4 @@
+using appcore.Configuration;
 using appcore.Entities;
 using appcore.Entities.Events;
 using appcore.Infra;
@@ -21,7 +22,7 @@ public class AuctionServiceTests
 	public async Task GetAuctionState_ReturnsEmptyForUnknownId()
 	{
 		var store = new InMemoryEventStore([]);
-		var service = new AuctionService(store);
+		var service = new AuctionService(store, new AuctionConfig());
 
 		var state = await service.GetAuctionState(Guid.NewGuid());
 
@@ -34,7 +35,7 @@ public class AuctionServiceTests
 		var auctionId = Guid.NewGuid();
 		var created = CreateCreatedEvent(auctionId);
 		var store = new InMemoryEventStore([EventSerializer.Serialize(created)]);
-		var service = new AuctionService(store);
+		var service = new AuctionService(store, new AuctionConfig());
 
 		var state = await service.GetAuctionState(auctionId);
 
@@ -52,7 +53,7 @@ public class AuctionServiceTests
 	{
 		var auctionId = Guid.NewGuid();
 		var store = new InMemoryEventStore([EventSerializer.Serialize(CreateCreatedEvent(auctionId))]);
-		var service = new AuctionService(store);
+		var service = new AuctionService(store, new AuctionConfig());
 
 		var state = await service.GetAuctionState(auctionId);
 
@@ -68,7 +69,7 @@ public class AuctionServiceTests
 		var auctionId = Guid.NewGuid();
 		var created = CreateCreatedEvent(auctionId, isPublished: false);
 		var store = new InMemoryEventStore([EventSerializer.Serialize(created)]);
-		var service = new AuctionService(store);
+		var service = new AuctionService(store, new AuctionConfig());
 
 		var state = await service.GetAuctionState(auctionId);
 
@@ -89,7 +90,7 @@ public class AuctionServiceTests
 			EventSerializer.Serialize(created),
 			EventSerializer.Serialize(updated),
 		]);
-		var service = new AuctionService(store);
+		var service = new AuctionService(store, new AuctionConfig());
 
 		var state = await service.GetAuctionState(auctionId);
 
@@ -111,7 +112,7 @@ public class AuctionServiceTests
 			EventSerializer.Serialize(created),
 			EventSerializer.Serialize(updated),
 		]);
-		var service = new AuctionService(store);
+		var service = new AuctionService(store, new AuctionConfig());
 
 		var state = await service.GetAuctionState(auctionId);
 
@@ -146,7 +147,7 @@ public class AuctionServiceTests
 			EventSerializer.Serialize(imagesAdded),
 			EventSerializer.Serialize(imagesRemoved),
 		]);
-		var service = new AuctionService(store);
+		var service = new AuctionService(store, new AuctionConfig());
 
 		var state = await service.GetAuctionState(auctionId);
 
@@ -168,7 +169,7 @@ public class AuctionServiceTests
 			EventSerializer.Serialize(created),
 			EventSerializer.Serialize(closed),
 		]);
-		var service = new AuctionService(store);
+		var service = new AuctionService(store, new AuctionConfig());
 
 		var state = await service.GetAuctionState(auctionId);
 
@@ -197,7 +198,7 @@ public class AuctionServiceTests
 			EventSerializer.Serialize(update2) with { SequenceId = 3 },
 		};
 		var store = new InMemoryEventStore(rows);
-		var service = new AuctionService(store);
+		var service = new AuctionService(store, new AuctionConfig());
 
 		var state = await service.GetAuctionState(auctionId);
 
@@ -226,7 +227,7 @@ public class AuctionServiceTests
 			EventSerializer.Serialize(update1) with { SequenceId = 3 },
 		};
 		var store = new InMemoryEventStore(rows);
-		var service = new AuctionService(store);
+		var service = new AuctionService(store, new AuctionConfig());
 
 		var state = await service.GetAuctionState(auctionId);
 
@@ -244,7 +245,7 @@ public class AuctionServiceTests
 			EventSerializer.Serialize(created),
 			EventSerializer.Serialize(otherCreated),
 		]);
-		var service = new AuctionService(store);
+		var service = new AuctionService(store, new AuctionConfig());
 
 		var state = await service.GetAuctionState(auctionId);
 
@@ -265,7 +266,7 @@ public class AuctionServiceTests
 			EventSerializer.Serialize(created2),
 			EventSerializer.Serialize(updated1),
 		]);
-		var service = new AuctionService(store);
+		var service = new AuctionService(store, new AuctionConfig());
 
 		var ids = await service.GetAllAuctionIds();
 
@@ -278,7 +279,7 @@ public class AuctionServiceTests
 	public async Task GetAuctionSummary_ReturnsNullForUnknownId()
 	{
 		var store = new InMemoryEventStore([]);
-		var service = new AuctionService(store);
+		var service = new AuctionService(store, new AuctionConfig());
 
 		var summary = await service.GetAuctionSummary(Guid.NewGuid());
 
@@ -300,7 +301,7 @@ public class AuctionServiceTests
 			EventSerializer.Serialize(created),
 			EventSerializer.Serialize(imagesAdded),
 		]);
-		var service = new AuctionService(store);
+		var service = new AuctionService(store, new AuctionConfig());
 
 		var summary = await service.GetAuctionSummary(auctionId);
 
@@ -322,10 +323,103 @@ public class AuctionServiceTests
 			EventSerializer.Serialize(CreateCreatedEvent(id1)),
 			EventSerializer.Serialize(CreateCreatedEvent(id2)),
 		]);
-		var service = new AuctionService(store);
+		var service = new AuctionService(store, new AuctionConfig());
 
 		var summaries = await service.ListAuctionSummaries();
 
 		Assert.Equal(2, summaries.Count);
+	}
+
+	private static AppEvent Bid(Guid auctionId, Guid bidderId, decimal maximum, long seq)
+		=> EventSerializer.Serialize(new BidPlaced
+		{
+			AuctionId = auctionId,
+			BidderId = bidderId,
+			MaximumAmount = maximum,
+		}) with { SequenceId = seq };
+
+	[Fact]
+	public async Task GetAuctionSummary_PopulatesCurrentBidAndSelfVisibility()
+	{
+		var auctionId = Guid.NewGuid();
+		var me = Guid.NewGuid();
+		var other = Guid.NewGuid();
+		var store = new InMemoryEventStore([
+			EventSerializer.Serialize(CreateCreatedEvent(auctionId)) with { SequenceId = 1 },
+			Bid(auctionId, me, 100m, 2),
+			Bid(auctionId, other, 60m, 3),
+		]);
+		var service = new AuctionService(store, new AuctionConfig());
+
+		var summary = await service.GetAuctionSummary(auctionId, me);
+
+		Assert.NotNull(summary);
+		Assert.Equal(60.50m, summary.CurrentBid);
+		Assert.Equal(100m, summary.MyHighest);
+		Assert.True(summary.IsHighestBidder);
+	}
+
+	[Fact]
+	public async Task GetAuctionSummary_ViewerBehindHighest_IsNotRevealedAsHighest()
+	{
+		var auctionId = Guid.NewGuid();
+		var me = Guid.NewGuid();
+		var leader = Guid.NewGuid();
+		var store = new InMemoryEventStore([
+			EventSerializer.Serialize(CreateCreatedEvent(auctionId)) with { SequenceId = 1 },
+			Bid(auctionId, leader, 100m, 2),
+			Bid(auctionId, me, 60m, 3),
+		]);
+		var service = new AuctionService(store, new AuctionConfig());
+
+		var summary = await service.GetAuctionSummary(auctionId, me);
+
+		Assert.NotNull(summary);
+		Assert.Equal(60.50m, summary.CurrentBid);
+		Assert.Equal(60m, summary.MyHighest);
+		Assert.False(summary.IsHighestBidder);
+	}
+
+	[Fact]
+	public async Task GetAuctionSummary_UnrelatedViewer_SeesPriceButNoBidderInfo()
+	{
+		var auctionId = Guid.NewGuid();
+		var leader = Guid.NewGuid();
+		var viewer = Guid.NewGuid();
+		var store = new InMemoryEventStore([
+			EventSerializer.Serialize(CreateCreatedEvent(auctionId)) with { SequenceId = 1 },
+			Bid(auctionId, leader, 100m, 2),
+		]);
+		var service = new AuctionService(store, new AuctionConfig());
+
+		var summary = await service.GetAuctionSummary(auctionId, viewer);
+
+		Assert.NotNull(summary);
+		Assert.Equal(25.00m, summary.CurrentBid);
+		Assert.Null(summary.MyHighest);
+		Assert.False(summary.IsHighestBidder);
+	}
+
+	[Fact]
+	public async Task GetAuctionSummary_ThirdPlaceViewer_StillSeesOwnMax()
+	{
+		var auctionId = Guid.NewGuid();
+		var a = Guid.NewGuid();
+		var b = Guid.NewGuid();
+		var me = Guid.NewGuid();
+		var store = new InMemoryEventStore([
+			EventSerializer.Serialize(CreateCreatedEvent(auctionId)) with { SequenceId = 1 },
+			Bid(auctionId, a, 100m, 2),
+			Bid(auctionId, b, 90m, 3),
+			Bid(auctionId, me, 60m, 4),
+		]);
+		var service = new AuctionService(store, new AuctionConfig());
+
+		var summary = await service.GetAuctionSummary(auctionId, me);
+
+		Assert.NotNull(summary);
+		Assert.Equal(90.50m, summary.CurrentBid);
+		Assert.Equal(60m, summary.MyHighest);
+		Assert.False(summary.IsHighestBidder);
 	}
 }

@@ -27,6 +27,7 @@ if (IsRealLaunch)
 builder.RegisterAppcoreServices();
 
 builder.Services.AddSingleton(config);
+builder.Services.AddSingleton(config.AuctionConfig);
 builder.Services.AddScoped<UserProvisionService>();
 builder.Services.AddSingleton<IImageStorage, ImageStorageService>();
 

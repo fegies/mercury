@@ -13,7 +13,7 @@ public record UserState(
 	string? Role
 )
 {
-	public static UserState Incorporate(UserState state, StoredEvent e) => e switch
+	public static UserState Incorporate(UserState state, long sequenceId, StoredEvent e) => e switch
 	{
 		UserCreated created => state with
 		{

@@ -14,6 +14,18 @@ export type AuctionSummary = {
     isPublished: boolean;
     imageUrls: Array<string>;
     currentBid?: null | number;
+    myHighest?: null | number;
+    isHighestBidder?: boolean;
+};
+
+export type BidRequest = {
+    maximumAmount: number;
+};
+
+export type BidResult = {
+    currentBid: number;
+    myHighest: null | number;
+    isHighestBidder: boolean;
 };
 
 export type CreateAuctionRequest = {
@@ -256,6 +268,37 @@ export type PostApiAuctionsByIdCloseResponses = {
 };
 
 export type PostApiAuctionsByIdCloseResponse = PostApiAuctionsByIdCloseResponses[keyof PostApiAuctionsByIdCloseResponses];
+
+export type PostApiAuctionsByIdBidData = {
+    body: BidRequest;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/auctions/{id}/bid';
+};
+
+export type PostApiAuctionsByIdBidErrors = {
+    /**
+     * Bad Request
+     */
+    400: ProblemDetails;
+    /**
+     * Not Found
+     */
+    404: ProblemDetails;
+};
+
+export type PostApiAuctionsByIdBidError = PostApiAuctionsByIdBidErrors[keyof PostApiAuctionsByIdBidErrors];
+
+export type PostApiAuctionsByIdBidResponses = {
+    /**
+     * OK
+     */
+    200: BidResult;
+};
+
+export type PostApiAuctionsByIdBidResponse = PostApiAuctionsByIdBidResponses[keyof PostApiAuctionsByIdBidResponses];
 
 export type GetApiAuctionsByAuctionIdImagesByImageIdData = {
     body?: never;

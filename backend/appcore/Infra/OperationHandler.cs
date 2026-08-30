@@ -10,11 +10,12 @@ public static class EventTypeNames
 	public const string AuctionImagesAdded = nameof(Entities.Events.AuctionImagesAdded);
 	public const string AuctionImagesRemoved = nameof(Entities.Events.AuctionImagesRemoved);
 	public const string AuctionClosed = nameof(Entities.Events.AuctionClosed);
+	public const string BidPlaced = nameof(Entities.Events.BidPlaced);
 	public const string UserCreated = nameof(Entities.Events.UserCreated);
 	public const string UserUpdated = nameof(Entities.Events.UserUpdated);
 	public const string UserRoleChanged = nameof(Entities.Events.UserRoleChanged);
 
-	public static readonly string[] Auction = [AuctionCreated, AuctionUpdated, AuctionImagesAdded, AuctionImagesRemoved, AuctionClosed];
+	public static readonly string[] Auction = [AuctionCreated, AuctionUpdated, AuctionImagesAdded, AuctionImagesRemoved, AuctionClosed, BidPlaced];
 	public static readonly string[] User = [UserCreated, UserUpdated, UserRoleChanged];
 
 	public static EventSelector ForOidIdentity(string issuer, string subject)

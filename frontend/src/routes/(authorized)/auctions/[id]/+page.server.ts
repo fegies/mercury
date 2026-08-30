@@ -1,6 +1,8 @@
-import { error } from '@sveltejs/kit';
+import { error, fail } from '@sveltejs/kit';
 import { build_client } from '$lib/api';
-import type { PageServerLoad } from './$types';
+import { read_error_message } from '$lib/auction_form';
+import { parse_bid_form } from '$lib/bid_form';
+import type { Actions, PageServerLoad, RequestEvent } from './$types';
 
 export const load: PageServerLoad = async (event) => {
 	await event.locals.authorize('User');
@@ -16,3 +18,32 @@ export const load: PageServerLoad = async (event) => {
 
 	return { auction: data };
 };
+
+export const actions = {
+	bid: async (event: RequestEvent) => {
+		await event.locals.authorize('User');
+
+		const formData = await event.request.formData();
+		const { values, errors } = parse_bid_form(formData);
+
+		if (!values || errors.length > 0) {
+			return fail(400, { errors });
+		}
+
+		const client = build_client(event);
+		const {
+			data,
+			error: apiError,
+			response
+		} = await client.postApiAuctionsByIdBid({
+			path: { id: event.params.id },
+			body: { maximumAmount: values.maximumAmount }
+		});
+
+		if (apiError) {
+			return fail(400, { errors: [await read_error_message(response)] });
+		}
+
+		return { bid: data };
+	}
+} satisfies Actions;

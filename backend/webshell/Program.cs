@@ -73,15 +73,9 @@ builder.Services.AddAuthentication(options =>
     options.TokenValidationParameters.RoleClaimType = "role";
     options.MapInboundClaims = false;
 
-    options.Events.OnTokenResponseReceived = (ctx) =>
+    options.Events.OnTokenValidated = async (ctx) =>
     {
-        ctx.HttpContext.Items["oidc.access_token"] = ctx.ProtocolMessage?.AccessToken;
-        return Task.CompletedTask;
-    };
-
-    options.Events.OnTicketReceived += async (ctx) =>
-    {
-        var accessToken = ctx.HttpContext.Items.TryGetValue("oidc.access_token", out var value) ? value as string : null;
+        var accessToken = ctx.ProtocolMessage?.AccessToken;
         await ctx.HttpContext.RequestServices.GetRequiredService<UserProvisionService>().ProvisionUser(ctx.Principal!, accessToken, CancellationToken.None);
     };
 });

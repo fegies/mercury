@@ -24,8 +24,13 @@ class ImageStorageService : IImageStorage
     public Task DeleteAsync(string area, Guid id, CancellationToken ct)
     {
         var filePath = FilePathFor(area, id);
-        if (File.Exists(filePath))
+        try
+        {
             File.Delete(filePath);
+        }
+        catch (FileNotFoundException)
+        {
+        }
         return Task.CompletedTask;
     }
 

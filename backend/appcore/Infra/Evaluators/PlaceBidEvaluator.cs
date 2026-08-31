@@ -30,17 +30,19 @@ public class PlaceBidEvaluator(decimal minBidIncrement) : IDecisionFunction<BidP
 		if (input.MaximumAmount <= 0)
 			throw new InvariantViolation("Maximum bid must be positive.");
 
+		var previousMax = AuctionState.MaxOfBidder(context, input.BidderId) ?? 0m;
+		if (input.MaximumAmount < previousMax)
+			throw new InvariantViolation("Cannot lower your previous bid");
+
 		var currentPrice = BidPricing.Compute(state, minBidIncrement).CurrentPrice;
 		if (input.MaximumAmount <= currentPrice)
 			throw new InvariantViolation("Bid must exceed the current price.");
 
 		var nextState = AuctionState.Incorporate(state, input);
 		var (highestBidderId, nextPrice) = BidPricing.Compute(nextState, minBidIncrement);
-		var previousMax = AuctionState.MaxOfBidder(context, input.BidderId) ?? 0m;
-		var myHighest = Math.Max(previousMax, input.MaximumAmount);
 
 		return new DecisionStep<BidResult>.Complete(
-			new BidResult(nextPrice, myHighest, highestBidderId == input.BidderId),
+			new BidResult(nextPrice, input.MaximumAmount, highestBidderId == input.BidderId),
 			[input]);
 	}
 }

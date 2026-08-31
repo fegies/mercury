@@ -2,7 +2,6 @@ import { error, fail } from '@sveltejs/kit';
 import { build_client } from '$lib/api';
 import {
 	parse_auction_form,
-	read_error_message,
 	selected_files,
 	to_auction
 } from '$lib/auction_form';
@@ -44,8 +43,8 @@ export const actions = {
 				}
 			});
 
-			if (apiError) {
-				errors.push(await read_error_message(response));
+			if (apiError?.detail) {
+				errors.push(apiError.detail);
 			}
 		}
 
@@ -67,13 +66,13 @@ export const actions = {
 		}
 
 		const client = build_client(event);
-		const { error: apiError, response } = await client.postApiAuctionsByIdImages({
+		const { error: apiError } = await client.postApiAuctionsByIdImages({
 			path: { id: event.params.id },
 			body: { Files: files }
 		});
 
 		if (apiError) {
-			return fail(400, { errors: [await read_error_message(response)] });
+			return fail(400, { errors: [apiError] });
 		}
 
 		return { success: true };
@@ -89,12 +88,12 @@ export const actions = {
 		}
 
 		const client = build_client(event);
-		const { error: apiError, response } = await client.deleteApiAuctionsByIdImagesByImageId({
+		const { error: apiError } = await client.deleteApiAuctionsByIdImagesByImageId({
 			path: { id: event.params.id, imageId }
 		});
 
 		if (apiError) {
-			return fail(400, { errors: [await read_error_message(response)] });
+			return fail(400, { errors: [apiError] });
 		}
 
 		return { success: true };
@@ -104,12 +103,12 @@ export const actions = {
 		await event.locals.authorize('Admin');
 
 		const client = build_client(event);
-		const { error: apiError, response } = await client.postApiAuctionsByIdClose({
+		const { error: apiError } = await client.postApiAuctionsByIdClose({
 			path: { id: event.params.id }
 		});
 
 		if (apiError) {
-			return fail(400, { errors: [await read_error_message(response)] });
+			return fail(400, { errors: [apiError] });
 		}
 
 		return { success: true };

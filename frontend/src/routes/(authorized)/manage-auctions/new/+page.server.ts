@@ -1,5 +1,5 @@
 import { fail, redirect } from '@sveltejs/kit';
-import { parse_auction_form, read_error_message, to_auction } from '$lib/auction_form';
+import { parse_auction_form, to_auction } from '$lib/auction_form';
 import { build_client } from '$lib/api';
 import type { AuctionSummary } from '$lib/types/auction.js';
 import type { Actions, RequestEvent } from './$types';
@@ -15,23 +15,22 @@ export const actions = {
 		const auction: AuctionSummary = values
 			? to_auction(values)
 			: {
-					id: '',
-					title: '',
-					description: '',
-					minimumPrice: 0,
-					closureTime: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-					isClosed: false,
-					isPublished: false,
-					imageUrls: [],
-					currentBid: null
-				};
+				id: '',
+				title: '',
+				description: '',
+				minimumPrice: 0,
+				closureTime: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+				isClosed: false,
+				isPublished: false,
+				imageUrls: [],
+				currentBid: null
+			};
 
 		if (values) {
 			const client = build_client(event);
 			const {
 				data,
 				error: apiError,
-				response
 			} = await client.postApiAuctions({
 				body: {
 					title: values.title,
@@ -43,7 +42,7 @@ export const actions = {
 			});
 
 			if (apiError) {
-				errors.push(await read_error_message(response));
+				errors.push(apiError.detail ?? JSON.stringify(apiError));
 			} else {
 				redirect(303, `/manage-auctions/${data}`);
 			}

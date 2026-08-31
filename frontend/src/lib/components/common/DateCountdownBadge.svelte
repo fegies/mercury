@@ -29,13 +29,29 @@
 
 	let longText = $derived.by(() => {
 		if (remainingTime.expired) return 'EXPIRED';
-		return JSON.stringify(remainingTime);
+
+		if (remainingTime.weeks > 2) return `> ${remainingTime.weeks} weeks`;
+
+		const full_days = remainingTime.days + remainingTime.weeks * 7;
+
+		const components = [];
+
+		if (remainingTime.days > 0) components.push(`${full_days} days`);
+		if (remainingTime.hours > 0) components.push(`${remainingTime.hours} hours`);
+
+		if (remainingTime.days < 2 && remainingTime.weeks == 0) {
+			// getting close. Increase precision
+			if (remainingTime.minutes > 0) components.push(`${remainingTime.minutes} minutes`);
+
+			if (remainingTime.days == 0 && remainingTime.hours < 4 && remainingTime.seconds > 0)
+				components.push(`${remainingTime.seconds} seconds`);
+		}
+
+		return 'in ' + components.join(', ');
 	});
 
 	let shortText = $derived.by(() => {
 		if (remainingTime.expired) return 'EXPIRED';
-
-		if (remainingTime.weeks > 1) return `${remainingTime.weeks} weeks`;
 
 		return longText;
 	});
@@ -49,4 +65,4 @@
 	});
 </script>
 
-<span title={longText}>{shortText}</span>
+<span>{shortText}</span>

@@ -1,6 +1,5 @@
 import { error, fail } from '@sveltejs/kit';
 import { build_client } from '$lib/api';
-import { read_error_message } from '$lib/auction_form';
 import { parse_bid_form } from '$lib/bid_form';
 import type { Actions, PageServerLoad, RequestEvent } from './$types';
 
@@ -34,14 +33,13 @@ export const actions = {
 		const {
 			data,
 			error: apiError,
-			response
 		} = await client.postApiAuctionsByIdBid({
 			path: { id: event.params.id },
 			body: { maximumAmount: values.maximumAmount }
 		});
 
 		if (apiError) {
-			return fail(400, { errors: [await read_error_message(response)] });
+			return fail(400, { errors: [apiError] });
 		}
 
 		return { bid: data };

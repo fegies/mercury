@@ -4,9 +4,15 @@
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 
-	let currentBid = $derived(form?.bid?.currentBid ?? data.auction.currentBid ?? null);
-	let myHighest = $derived(form?.bid?.myHighest ?? data.auction.myHighest ?? null);
-	let isHighestBidder = $derived(form?.bid?.isHighestBidder ?? data.auction.isHighestBidder);
+	let currentBid = $derived(
+		form?.bid?.currentBid ?? data.auction.currentBid ?? data.auction.minimumPrice
+	);
+	let myHighest = $derived(form?.bid?.myHighest ?? data.auction.myHighest ?? 0);
+	let i_am_highest_bidder = $derived(form?.bid?.isHighestBidder ?? data.auction.isHighestBidder);
+
+	let min_increase = $derived(Math.max(myHighest, currentBid) + 0.5);
+
+	let i_placed_a_bet = $derived(myHighest > 0);
 </script>
 
 <svelte:head>
@@ -26,16 +32,22 @@
 		<section class="card flex flex-col gap-4 p-6">
 			<h2 class="h3">Place a bid</h2>
 
-			{#if currentBid !== null}
-				<p>
-					Current price: <strong>€{currentBid.toFixed(2)}</strong>
-					{#if isHighestBidder}
-						<span class="preset-filled-success-500 badge">You are the highest bidder</span>
-					{/if}
-				</p>
-			{/if}
+			<p>
+				Current price: <strong>€{currentBid.toFixed(2)}</strong>
+				{#if i_am_highest_bidder}
+					<span
+						class="inline-flex items-center rounded-md bg-green-400/10 px-2 py-1 align-middle text-xs font-medium text-green-400 inset-ring inset-ring-green-500/20"
+						>You are the highest bidder</span
+					>
+				{:else if i_placed_a_bet}
+					<span
+						class="inline-flex items-center rounded-md bg-red-400/10 px-2 py-1 text-xs font-medium text-red-400 inset-ring inset-ring-red-400/20"
+						>You have been outbid</span
+					>
+				{/if}
+			</p>
 
-			{#if myHighest !== null}
+			{#if myHighest != null}
 				<p>
 					Your maximum bid: <strong>€{myHighest.toFixed(2)}</strong>
 				</p>
@@ -56,15 +68,15 @@
 
 			<form method="POST" action="?/bid" class="flex flex-col gap-4">
 				<label class="label">
-					<span class="label-text">Your maximum bid</span>
+					<span class="label-text">Raise your maximum bid</span>
 					<input
 						type="number"
 						name="maximum_amount"
-						step="0.01"
-						min="0"
+						step="0.5"
+						min={currentBid + 0.5}
 						required
 						class="input"
-						placeholder={currentBid !== null ? (currentBid + 0.5).toFixed(2) : '0.00'}
+						value={min_increase}
 					/>
 				</label>
 				<input type="submit" class="btn preset-filled-primary-500 w-fit" value="Place bid" />

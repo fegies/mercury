@@ -28,7 +28,7 @@ class ImageStorageService : IImageStorage
         {
             File.Delete(filePath);
         }
-        catch (FileNotFoundException)
+        catch (IOException)
         {
         }
         return Task.CompletedTask;

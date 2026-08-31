@@ -16,14 +16,7 @@ namespace backend.Controllers;
 [Route("api/auctions")]
 [ApiController]
 public class AuctionController(
-    AuctionService auctionService,
-    IncomingEventHandler<AuctionCreated, Guid> createAuctionHandler,
-    IncomingEventHandler<AuctionUpdated, bool> updateAuctionHandler,
-    IncomingEventHandler<AuctionImagesRemoved, bool> removeImagesHandler,
-    IncomingEventHandler<AuctionClosed, bool> closeAuctionHandler,
-    IncomingEventHandler<AuctionImagesAdded, bool> addImagesHandler,
-    IncomingEventHandler<BidPlaced, BidResult> placeBidHandler,
-    IImageStorage imageStorage) : ControllerBase
+    AuctionService auctionService, IImageStorage imageStorage) : ControllerBase
 {
     private const string ImageArea = "auctions";
 
@@ -68,7 +61,7 @@ public class AuctionController(
     [Authorize(Policy = "IsAdmin")]
     [ProducesResponseType<Guid>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    public async Task<Guid> CreateAuction([FromBody] CreateAuctionRequest request, CancellationToken ct)
+    public async Task<Guid> CreateAuction([FromServices] IncomingEventHandler<AuctionCreated, Guid> createAuctionHandler, [FromBody] CreateAuctionRequest request, CancellationToken ct)
     {
         var auctionId = Guid.NewGuid();
 
@@ -94,7 +87,7 @@ public class AuctionController(
     [Authorize(Policy = "IsAdmin")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    public async Task<ActionResult> UpdateAuction(Guid id, [FromBody] UpdateAuctionRequest request, CancellationToken ct)
+    public async Task<ActionResult> UpdateAuction(IncomingEventHandler<AuctionUpdated, bool> updateAuctionHandler, Guid id, [FromBody] UpdateAuctionRequest request, CancellationToken ct)
     {
         var updatedEvent = new AuctionUpdated
         {
@@ -119,12 +112,14 @@ public class AuctionController(
     [Authorize(Policy = "IsAdmin")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    public async Task<ActionResult> UploadImages(Guid id, [FromForm] UploadImagesRequest request, CancellationToken ct)
+    public async Task<ActionResult> UploadImages(
+        [FromServices] IncomingEventHandler<AuctionImagesAdded, bool> addImagesHandler,
+        Guid id, [FromForm] UploadImagesRequest request, CancellationToken ct)
     {
         if (request.Files.Count == 0)
             return BadRequest("No files uploaded.");
 
-        await StoreAndAddImages(id, request.Files, ct);
+        await StoreAndAddImages(addImagesHandler, id, request.Files, ct);
 
         return NoContent();
     }
@@ -136,7 +131,7 @@ public class AuctionController(
     [Authorize(Policy = "IsAdmin")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    public async Task<ActionResult> RemoveImage(Guid id, Guid imageId, CancellationToken ct)
+    public async Task<ActionResult> RemoveImage(IncomingEventHandler<AuctionImagesRemoved, bool> removeImagesHandler, Guid id, Guid imageId, CancellationToken ct)
     {
         var removedEvent = new AuctionImagesRemoved
         {
@@ -158,7 +153,7 @@ public class AuctionController(
     [Authorize(Policy = "IsAdmin")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    public async Task<ActionResult> CloseAuction(Guid id, CancellationToken ct)
+    public async Task<ActionResult> CloseAuction([FromServices] IncomingEventHandler<AuctionClosed, bool> closeAuctionHandler, Guid id, CancellationToken ct)
     {
         var closedEvent = new AuctionClosed
         {
@@ -213,6 +208,7 @@ public class AuctionController(
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<BidResult> PlaceBid(
+        [FromServices] IncomingEventHandler<BidPlaced, BidResult> placeBidHandler,
         [FromCurrentUser] Guid currentUserId, Guid id, [FromBody] BidRequest request, CancellationToken ct)
     {
         var bidEvent = new BidPlaced
@@ -243,7 +239,9 @@ public class AuctionController(
 
     private bool IsAdmin => User.FindAll("mercury.role").Any(c => c.Value == "Admin");
 
-    private async Task StoreAndAddImages(Guid auctionId, List<IFormFile> files, CancellationToken ct)
+    private async Task StoreAndAddImages(
+        IncomingEventHandler<AuctionImagesAdded, bool> addImagesHandler,
+        Guid auctionId, List<IFormFile> files, CancellationToken ct)
     {
         var imageRefs = new List<AuctionImageRef>();
 

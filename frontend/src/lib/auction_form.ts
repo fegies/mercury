@@ -63,18 +63,6 @@ export function selected_files(formData: FormData, name = 'images'): File[] {
 	return formData.getAll(name).filter((f): f is File => f instanceof File && f.size > 0);
 }
 
-export async function read_error_message(resp: Response | undefined): Promise<string> {
-	if (!resp) return 'Request failed';
-	const text = await resp.text();
-	if (!text) return `Request failed (${resp.status})`;
-
-	try {
-		const body = JSON.parse(text);
-		return body?.message ?? body?.title ?? text;
-	} catch {
-		return text;
-	}
-}
 
 export function to_auction(values: AuctionFormValues): AuctionSummary {
 	return {

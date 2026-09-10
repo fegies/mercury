@@ -98,7 +98,6 @@ nix develop     # Enter dev shell
 
 - **PostgreSQL** via raw Npgsql (`NpgsqlDataSource`); no ORM
 - **Event sourcing** for auctions and users (single `app_events` table); table is ensured at startup (`EventStoreSchema.EnsureCreatedAsync`)
-- **Raw SQL** (postgres-js) in frontend server routes for profile pictures
 - Database: PostgreSQL, named `mercury`
 
 ### Event Sourcing

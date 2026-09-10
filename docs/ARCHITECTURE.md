@@ -208,9 +208,3 @@ cd frontend && npm run openapi-ts # Regenerate API client
 cd backend && dotnet build        # Build
 cd backend && dotnet run --project webshell  # Run backend
 ```
-
-## Current State
-
-**Active early development.** Known gaps:
-- Liveticker SSE is a demo prototype
-- `nix/backend_package.nix` references `rustPlatform` — leftover from previous Rust backend

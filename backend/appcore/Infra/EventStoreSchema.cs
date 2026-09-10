@@ -14,7 +14,16 @@ public static class EventStoreSchema
 				insertion_time timestamptz NOT NULL DEFAULT now(),
 				event_type     text NOT NULL,
 				payload        jsonb NOT NULL
-			)
+			);
+			create index if not exists {TableName}_eventtypes on {TableName} (event_type);
+			create index if not exists {TableName}_payload_gin on {TableName} using gin (payload jsonb_path_ops); 
+
+			create or replace function assert_true(chck boolean, message text)
+			returns void as $$
+			begin
+				assert chck, message;
+			end
+			$$ language plpgsql
 			""");
 		await cmd.ExecuteNonQueryAsync(ct);
 	}

@@ -2,7 +2,13 @@ using appcore.Entities;
 
 namespace appcore.Infra;
 
-public sealed record EventContext(IReadOnlyList<AppEvent> Events, long Head)
+public sealed record EventContext(
+	/// the specific query this context was built for. Used to distinguish empty results vs not yet executed expansions
+	EventSelector[] Query,
+	/// the returned events
+	IReadOnlyList<AppEvent> Events
+	/// consistency head
+	, long Head)
 {
 	public TState Fold<TState>(TState seed, Func<TState, StoredEvent, TState> fold)
 	{

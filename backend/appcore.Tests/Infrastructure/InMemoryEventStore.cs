@@ -26,7 +26,7 @@ internal sealed class InMemoryEventStore : IEventStore, IEventReader
 			.OrderBy(e => e.SequenceId)
 			.ToList();
 		var head = matching.Count > 0 ? matching.Max(e => e.SequenceId) : 0L;
-		return Task.FromResult(new EventContext(matching, head));
+		return Task.FromResult(new EventContext(boundary, matching, head));
 	}
 
 	public Task Append(IReadOnlyList<StoredEvent> events, ConsistencyBoundary boundary, CancellationToken ct)
@@ -55,7 +55,12 @@ internal static class TestContext
 {
 	public static EventContext From(params AppEvent[] events)
 	{
+		return From([], events);
+	}
+
+	public static EventContext From(EventSelector[] query, params AppEvent[] events)
+	{
 		var head = events.Length > 0 ? events.Max(e => e.SequenceId) : 0L;
-		return new EventContext(events, head);
+		return new EventContext(query, events, head);
 	}
 }

@@ -115,6 +115,21 @@ public class AuctionDeadlineSchedulerTests
 		Assert.Equal(open, elapsed.AuctionId);
 	}
 
+	[Fact]
+	public async Task ScheduleWhileParkedOnCapDelayStillFiresOnTime()
+	{
+		var stream = Start(); // nothing scheduled yet: loop parks on the 24h cap
+		var id = Guid.NewGuid();
+		var deadline = Now().AddHours(1);
+		_scheduler.Schedule(id, deadline);
+
+		Assert.True(await stream.NothingAsync());
+		_clock.Advance(TimeSpan.FromHours(1));
+
+		var elapsed = await stream.NextAsync();
+		Assert.Equal(id, elapsed.AuctionId);
+	}
+
 	private DateTime Now() => _clock.GetUtcNow().UtcDateTime;
 
 	private Stream Start() => new(_scheduler);

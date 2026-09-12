@@ -262,4 +262,32 @@ describe('manage-auctions/[id] actions', () => {
 			expect(result).toEqual({ success: true });
 		});
 	});
+
+	describe('cancel', () => {
+		it('cancels the auction and returns success', async () => {
+			const cancel = vi
+				.fn()
+				.mockResolvedValue({ error: undefined, response: new Response('', { status: 200 }) });
+			make_client({ postApiAuctionsByIdCancel: cancel });
+
+			const result = await actions.cancel(event());
+
+			expect(cancel).toHaveBeenCalledWith({ path: { id: 'auction-1' } });
+			expect(result).toEqual({ success: true });
+		});
+
+		it('surfaces the API error payload', async () => {
+			const cancel = vi.fn().mockResolvedValue({
+				error: { status: 400, detail: 'Auction is already closed.' }
+			});
+			make_client({ postApiAuctionsByIdCancel: cancel });
+
+			const resultFail = failure(await actions.cancel(event()));
+
+			expect(resultFail.status).toBe(400);
+			expect(resultFail.data.errors).toEqual([
+				{ status: 400, detail: 'Auction is already closed.' }
+			]);
+		});
+	});
 });

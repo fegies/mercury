@@ -80,12 +80,22 @@
 
 <section class="flex flex-col gap-3">
 	<h2 class="h3">Danger zone</h2>
-	{#if data.auction.isClosed}
+	{#if data.auction.isCancelled}
+		<span class="preset-filled-error-500 badge">Cancelled</span>
+	{:else if data.auction.isClosed}
 		<span class="preset-filled-error-500 badge">Closed</span>
 	{:else}
-		<p>Closing an auction is permanent. Bids can no longer be placed afterwards.</p>
-		<form method="POST" action="?/close">
-			<button type="submit" class="btn preset-filled-error-500 w-fit">Close Auction</button>
-		</form>
+		<p>
+			Closing an auction is permanent. Bids can no longer be placed afterwards. Closing declares a
+			winner; cancelling abandons the sale entirely with no winner.
+		</p>
+		<div class="flex gap-3">
+			<form method="POST" action="?/close">
+				<button type="submit" class="btn preset-filled-primary-500 w-fit">Close Auction</button>
+			</form>
+			<form method="POST" action="?/cancel">
+				<button type="submit" class="btn preset-filled-error-500 w-fit">Cancel Auction</button>
+			</form>
+		</div>
 	{/if}
 </section>

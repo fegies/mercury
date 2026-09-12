@@ -192,6 +192,25 @@ public class AuctionController(
     }
 
     /// <summary>
+    /// Cancels an open auction. The auction is closed permanently without a winner.
+    /// </summary>
+    [HttpPost("{id}/cancel")]
+    [Authorize(Policy = "IsAdmin")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult> CancelAuction([FromServices] IncomingEventHandler<AuctionCancelled, bool> cancelAuctionHandler, Guid id, CancellationToken ct)
+    {
+        var cancelledEvent = new AuctionCancelled
+        {
+            AuctionId = id,
+        };
+
+        await cancelAuctionHandler.Execute(cancelledEvent, ct);
+
+        return NoContent();
+    }
+
+    /// <summary>
     /// Lists all auctions.
     /// </summary>
     [HttpGet]

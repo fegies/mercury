@@ -67,6 +67,7 @@ export function to_auction(values: AuctionFormValues): AuctionSummary {
 	return {
 		id: '',
 		isClosed: false,
+		isCancelled: false,
 		imageUrls: [],
 		currentBid: null,
 		...values

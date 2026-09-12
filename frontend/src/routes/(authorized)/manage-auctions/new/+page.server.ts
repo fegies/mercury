@@ -15,23 +15,20 @@ export const actions = {
 		const auction: AuctionSummary = values
 			? to_auction(values)
 			: {
-				id: '',
-				title: '',
-				description: '',
-				minimumPrice: 0,
-				closureTime: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-				isClosed: false,
-				isPublished: false,
-				imageUrls: [],
-				currentBid: null
-			};
+					id: '',
+					title: '',
+					description: '',
+					minimumPrice: 0,
+					closureTime: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+					isClosed: false,
+					isPublished: false,
+					imageUrls: [],
+					currentBid: null
+				};
 
 		if (values) {
 			const client = build_client(event);
-			const {
-				data,
-				error: apiError,
-			} = await client.postApiAuctions({
+			const { data, error: apiError } = await client.postApiAuctions({
 				body: {
 					title: values.title,
 					description: values.description,

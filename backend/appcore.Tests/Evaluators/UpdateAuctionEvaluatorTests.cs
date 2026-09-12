@@ -110,24 +110,6 @@ public class UpdateAuctionEvaluatorTests
 	}
 
 	[Fact]
-	public void Update_PastClosureTime_ThrowsInvariantViolation()
-	{
-		var auctionId = Guid.NewGuid();
-		var baseEvent = CreateBaseAppEvent(auctionId);
-		var evaluator = new UpdateAuctionEvaluator();
-		var input = new AuctionUpdated
-		{
-			AuctionId = auctionId,
-			ClosureTime = DateTime.UtcNow.AddDays(-1)
-		};
-
-		var ex = Assert.Throws<InvariantViolation>(() =>
-			evaluator.Step(input, TestContext.From(EventSerializer.Serialize(baseEvent))));
-
-		Assert.Equal("Closure time must be in the future.", ex.Message);
-	}
-
-	[Fact]
 	public void Update_OnlyChangedFields_EmitsMinimalEvent()
 	{
 		var auctionId = Guid.NewGuid();
@@ -147,6 +129,5 @@ public class UpdateAuctionEvaluatorTests
 		Assert.Equal("Only Title Changed", emitted.Title);
 		Assert.Null(emitted.Description);
 		Assert.Null(emitted.MinimumPrice);
-		Assert.Null(emitted.ClosureTime);
 	}
 }

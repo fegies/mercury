@@ -1,10 +1,5 @@
 import { describe, expect, it, vi, afterEach } from 'vitest';
-import {
-	parse_auction_form,
-	read_error_message,
-	selected_files,
-	to_auction
-} from '../src/lib/auction_form';
+import { parse_auction_form, selected_files, to_auction } from '../src/lib/auction_form';
 
 function form(entries: Record<string, string | File | undefined>): FormData {
 	const fd = new FormData();
@@ -134,32 +129,6 @@ describe('selected_files', () => {
 		const files = selected_files(fd);
 
 		expect(files).toEqual([real]);
-	});
-});
-
-describe('read_error_message', () => {
-	it('parses a JSON body with a message', async () => {
-		const resp = new Response(JSON.stringify({ message: 'boom' }), { status: 400 });
-		expect(await read_error_message(resp)).toBe('boom');
-	});
-
-	it('parses a JSON body with a title', async () => {
-		const resp = new Response(JSON.stringify({ title: 'oops' }), { status: 400 });
-		expect(await read_error_message(resp)).toBe('oops');
-	});
-
-	it('falls back to the raw text body', async () => {
-		const resp = new Response('plain failure', { status: 400 });
-		expect(await read_error_message(resp)).toBe('plain failure');
-	});
-
-	it('falls back to the status when the body is empty', async () => {
-		const resp = new Response('', { status: 500 });
-		expect(await read_error_message(resp)).toBe('Request failed (500)');
-	});
-
-	it('handles an undefined response', async () => {
-		expect(await read_error_message(undefined)).toBe('Request failed');
 	});
 });
 

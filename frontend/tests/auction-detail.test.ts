@@ -79,7 +79,7 @@ describe('auctions/[id] actions', () => {
 			form.set('maximum_amount', '5');
 
 			const bid = vi.fn().mockResolvedValue({
-				error: { status: 400 },
+				error: { status: 400, detail: 'Bid must exceed the current price.' },
 				response: new Response(JSON.stringify({ message: 'Bid must exceed the current price.' }), {
 					status: 400
 				})
@@ -89,7 +89,9 @@ describe('auctions/[id] actions', () => {
 			const result = failure(await actions.bid(event({ form })));
 
 			expect(result.status).toBe(400);
-			expect(result.data.errors).toEqual(['Bid must exceed the current price.']);
+			expect(result.data.errors).toEqual([
+				{ status: 400, detail: 'Bid must exceed the current price.' }
+			]);
 		});
 	});
 });

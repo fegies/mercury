@@ -156,6 +156,27 @@ public class AuctionServiceTests
 	}
 
 	[Fact]
+	public async Task GetAuctionState_IncorporatesCloseExtension()
+	{
+		var auctionId = Guid.NewGuid();
+		var created = CreateCreatedEvent(auctionId);
+		var extended = new AuctionCloseExtended
+		{
+			AuctionId = auctionId,
+			NewClosureTime = DateTime.UtcNow.AddDays(21),
+		};
+		var store = new InMemoryEventStore([
+			EventSerializer.Serialize(created),
+			EventSerializer.Serialize(extended),
+		]);
+		var service = new AuctionService(store, new AuctionConfig());
+
+		var state = await service.GetAuctionState(auctionId);
+
+		Assert.Equal(extended.NewClosureTime, state.ClosureTime);
+	}
+
+	[Fact]
 	public async Task GetAuctionState_IncorporatesClosed()
 	{
 		var auctionId = Guid.NewGuid();

@@ -2,7 +2,7 @@
 
 import { type Client, type ClientMeta, formDataBodySerializer, type Options as Options2, type RequestResult, type TDataShape } from './client';
 import { client } from './client.gen';
-import type { DeleteApiAuctionsByIdImagesByImageIdData, DeleteApiAuctionsByIdImagesByImageIdErrors, DeleteApiAuctionsByIdImagesByImageIdResponses, GetApiAuctionsByAuctionIdImagesByImageIdData, GetApiAuctionsByAuctionIdImagesByImageIdErrors, GetApiAuctionsByAuctionIdImagesByImageIdResponses, GetApiAuctionsByIdData, GetApiAuctionsByIdErrors, GetApiAuctionsByIdResponses, GetApiAuctionsData, GetApiAuctionsResponses, GetApiProfilepicturesByIdData, GetApiProfilepicturesByIdErrors, GetApiProfilepicturesByIdResponses, GetApiUserinfoMeData, GetApiUserinfoMeResponses, PatchApiAuctionsByIdData, PatchApiAuctionsByIdErrors, PatchApiAuctionsByIdResponses, PostApiAuctionsByIdBidData, PostApiAuctionsByIdBidErrors, PostApiAuctionsByIdBidResponses, PostApiAuctionsByIdCloseData, PostApiAuctionsByIdCloseErrors, PostApiAuctionsByIdCloseResponses, PostApiAuctionsByIdImagesData, PostApiAuctionsByIdImagesErrors, PostApiAuctionsByIdImagesResponses, PostApiAuctionsData, PostApiAuctionsErrors, PostApiAuctionsResponses } from './types.gen';
+import type { DeleteApiAuctionsByIdImagesByImageIdData, DeleteApiAuctionsByIdImagesByImageIdErrors, DeleteApiAuctionsByIdImagesByImageIdResponses, GetApiAuctionsByAuctionIdImagesByImageIdData, GetApiAuctionsByAuctionIdImagesByImageIdErrors, GetApiAuctionsByAuctionIdImagesByImageIdResponses, GetApiAuctionsByIdData, GetApiAuctionsByIdErrors, GetApiAuctionsByIdResponses, GetApiAuctionsData, GetApiAuctionsResponses, GetApiProfilepicturesByIdData, GetApiProfilepicturesByIdErrors, GetApiProfilepicturesByIdResponses, GetApiUserinfoMeData, GetApiUserinfoMeResponses, PatchApiAuctionsByIdData, PatchApiAuctionsByIdErrors, PatchApiAuctionsByIdResponses, PostApiAuctionsByIdBidData, PostApiAuctionsByIdBidErrors, PostApiAuctionsByIdBidResponses, PostApiAuctionsByIdCloseData, PostApiAuctionsByIdCloseErrors, PostApiAuctionsByIdCloseResponses, PostApiAuctionsByIdExtendCloseData, PostApiAuctionsByIdExtendCloseErrors, PostApiAuctionsByIdExtendCloseResponses, PostApiAuctionsByIdImagesData, PostApiAuctionsByIdImagesErrors, PostApiAuctionsByIdImagesResponses, PostApiAuctionsData, PostApiAuctionsErrors, PostApiAuctionsResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -87,10 +87,26 @@ export class BackendClient extends HeyApiClient {
     
     /**
      * Updates the mutable fields of an auction. Closed auctions cannot be updated.
+     * The closure time is updated via a dedicated extension endpoint below.
      */
     public patchApiAuctionsById<ThrowOnError extends boolean = false>(options: Options<PatchApiAuctionsByIdData, ThrowOnError>): RequestResult<PatchApiAuctionsByIdResponses, PatchApiAuctionsByIdErrors, ThrowOnError> {
         return (options.client ?? this.client).patch<PatchApiAuctionsByIdResponses, PatchApiAuctionsByIdErrors, ThrowOnError>({
             url: '/api/auctions/{id}',
+            ...options,
+            headers: {
+                'Content-Type': 'application/json',
+                ...options.headers
+            }
+        });
+    }
+    
+    /**
+     * Extends the closure time of an open auction. The new closure time must be later than
+     * the current one; the closure date can only be moved further out, never closer.
+     */
+    public postApiAuctionsByIdExtendClose<ThrowOnError extends boolean = false>(options: Options<PostApiAuctionsByIdExtendCloseData, ThrowOnError>): RequestResult<PostApiAuctionsByIdExtendCloseResponses, PostApiAuctionsByIdExtendCloseErrors, ThrowOnError> {
+        return (options.client ?? this.client).post<PostApiAuctionsByIdExtendCloseResponses, PostApiAuctionsByIdExtendCloseErrors, ThrowOnError>({
+            url: '/api/auctions/{id}/extend-close',
             ...options,
             headers: {
                 'Content-Type': 'application/json',

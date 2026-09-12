@@ -41,7 +41,7 @@ describe('manage-auctions/[id] actions', () => {
 	});
 
 	describe('update', () => {
-		it('patches the auction and returns success', async () => {
+		it('patches the auction and extends the closure time when the end date changed', async () => {
 			const form = new FormData();
 			form.set('name', 'New Title');
 			form.set('description', 'New Desc');
@@ -49,23 +49,67 @@ describe('manage-auctions/[id] actions', () => {
 			form.set('auction-end', '2030-01-01T10:00:00.000Z');
 			form.set('published', 'on');
 
+			const get = vi.fn().mockResolvedValue({
+				data: { closureTime: '2029-01-01T10:00:00.000Z' },
+				error: undefined
+			});
+			const extend = vi
+				.fn()
+				.mockResolvedValue({ error: undefined, response: new Response('', { status: 204 }) });
 			const patch = vi
 				.fn()
-				.mockResolvedValue({ error: undefined, response: new Response('', { status: 200 }) });
-			make_client({ patchApiAuctionsById: patch });
+				.mockResolvedValue({ error: undefined, response: new Response('', { status: 204 }) });
+			make_client({
+				getApiAuctionsById: get,
+				postApiAuctionsByIdExtendClose: extend,
+				patchApiAuctionsById: patch
+			});
 
 			const result = await actions.update(event({ form }));
 
+			expect(get).toHaveBeenCalledWith({ path: { id: 'auction-1' } });
+			expect(extend).toHaveBeenCalledWith({
+				path: { id: 'auction-1' },
+				body: { closureTime: '2030-01-01T10:00:00.000Z' }
+			});
 			expect(patch).toHaveBeenCalledWith({
 				path: { id: 'auction-1' },
 				body: {
 					title: 'New Title',
 					description: 'New Desc',
 					minimumPrice: 10,
-					closureTime: '2030-01-01T10:00:00.000Z',
 					isPublished: true
 				}
 			});
+			expect(result).toEqual({ success: true });
+		});
+
+		it('skips the extension when the end date is unchanged', async () => {
+			const form = new FormData();
+			form.set('name', 'New Title');
+			form.set('description', 'New Desc');
+			form.set('min-price', '10');
+			form.set('auction-end', '2030-01-01T10:00:00.000Z');
+			form.set('published', 'on');
+
+			const get = vi.fn().mockResolvedValue({
+				data: { closureTime: '2030-01-01T10:00:00.000Z' },
+				error: undefined
+			});
+			const extend = vi.fn();
+			const patch = vi
+				.fn()
+				.mockResolvedValue({ error: undefined, response: new Response('', { status: 204 }) });
+			make_client({
+				getApiAuctionsById: get,
+				postApiAuctionsByIdExtendClose: extend,
+				patchApiAuctionsById: patch
+			});
+
+			const result = await actions.update(event({ form }));
+
+			expect(extend).not.toHaveBeenCalled();
+			expect(patch).toHaveBeenCalled();
 			expect(result).toEqual({ success: true });
 		});
 
@@ -87,6 +131,36 @@ describe('manage-auctions/[id] actions', () => {
 			expect(resultFail.data.errors).toContain('min-price must be present and a number');
 		});
 
+		it('surfaces an extension error and does not patch', async () => {
+			const form = new FormData();
+			form.set('name', 'New Title');
+			form.set('description', 'New Desc');
+			form.set('min-price', '10');
+			form.set('auction-end', '2030-01-01T10:00:00.000Z');
+			form.set('published', 'on');
+
+			const get = vi.fn().mockResolvedValue({
+				data: { closureTime: '2029-01-01T10:00:00.000Z' },
+				error: undefined
+			});
+			const extend = vi.fn().mockResolvedValue({
+				error: { status: 400, detail: 'Closure time can only be extended.' },
+				response: new Response('', { status: 400 })
+			});
+			const patch = vi.fn();
+			make_client({
+				getApiAuctionsById: get,
+				postApiAuctionsByIdExtendClose: extend,
+				patchApiAuctionsById: patch
+			});
+
+			const resultFail = failure(await actions.update(event({ form })));
+
+			expect(resultFail.status).toBe(400);
+			expect(resultFail.data.errors).toEqual(['Closure time can only be extended.']);
+			expect(patch).not.toHaveBeenCalled();
+		});
+
 		it('surfaces an API error payload', async () => {
 			const form = new FormData();
 			form.set('name', 'New Title');
@@ -94,13 +168,21 @@ describe('manage-auctions/[id] actions', () => {
 			form.set('min-price', '10');
 			form.set('auction-end', '2030-01-01T10:00:00.000Z');
 
+			const get = vi.fn().mockResolvedValue({
+				data: { closureTime: '2030-01-01T10:00:00.000Z' },
+				error: undefined
+			});
 			const patch = vi.fn().mockResolvedValue({
-				error: { status: 400 },
+				error: { status: 400, detail: 'Title must be non-empty.' },
 				response: new Response(JSON.stringify({ message: 'Title must be non-empty.' }), {
 					status: 400
 				})
 			});
-			make_client({ patchApiAuctionsById: patch });
+			make_client({
+				getApiAuctionsById: get,
+				postApiAuctionsByIdExtendClose: vi.fn(),
+				patchApiAuctionsById: patch
+			});
 
 			const resultFail = failure(await actions.update(event({ form })));
 

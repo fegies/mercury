@@ -6,12 +6,13 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using appcore.Entities;
+using appcore.Infra.Events;
 using Npgsql;
 using NpgsqlTypes;
 
 namespace appcore.Infra;
 
-public class DbEventStore(NpgsqlDataSource _datasource) : IEventStore, IEventReader
+public class DbEventStore(NpgsqlDataSource _datasource, IAppBus? _bus = null) : IEventStore, IEventReader
 {
 
 	public IEventReader Reader => this;
@@ -129,6 +130,12 @@ public class DbEventStore(NpgsqlDataSource _datasource) : IEventStore, IEventRea
 		batch.BatchCommands.Add(new NpgsqlBatchCommand("COMMIT"));
 
 		await batch.ExecuteNonQueryAsync(ct);
+
+		// The commit succeeded (the batch is BEGIN..COMMIT in one roundtrip); wake any in-memory
+		// consumers with the typed events so they can react without polling the durable log again.
+		if (_bus is not null)
+			foreach (var row in serialized)
+				await _bus.EmitAsync(EventSerializer.Deserialize(row), ct);
 	}
 
 	private static (string Sql, List<NpgsqlParameter> Parameters) BuildBoundaryPredicate(IReadOnlyList<EventSelector> boundary)

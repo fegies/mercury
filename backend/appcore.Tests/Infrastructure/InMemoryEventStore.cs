@@ -1,14 +1,17 @@
 using appcore.Entities;
 using appcore.Infra;
+using appcore.Infra.Events;
 
 namespace appcore.Tests.Infrastructure;
 
 internal sealed class InMemoryEventStore : IEventStore, IEventReader
 {
 	private readonly List<AppEvent> _events = [];
+	private readonly IAppBus? _bus;
 
-	public InMemoryEventStore(IEnumerable<AppEvent>? seed = null)
+	public InMemoryEventStore(IEnumerable<AppEvent>? seed = null, IAppBus? bus = null)
 	{
+		_bus = bus;
 		if (seed is not null)
 			_events.AddRange(seed);
 	}
@@ -29,10 +32,10 @@ internal sealed class InMemoryEventStore : IEventStore, IEventReader
 		return Task.FromResult(new EventContext(boundary, matching, head));
 	}
 
-	public Task Append(IReadOnlyList<StoredEvent> events, ConsistencyBoundary boundary, CancellationToken ct)
+	public async Task Append(IReadOnlyList<StoredEvent> events, ConsistencyBoundary boundary, CancellationToken ct)
 	{
 		if (events.Count == 0)
-			return Task.CompletedTask;
+			return;
 
 		foreach (var domainEvent in events)
 			EventPayload.Validate(EventSerializer.Serialize(domainEvent));
@@ -42,12 +45,17 @@ internal sealed class InMemoryEventStore : IEventStore, IEventReader
 			throw new ConcurrencyConflictException();
 
 		var next = (_events.Count > 0 ? _events.Max(e => e.SequenceId) : 0) + 1;
+		var appended = new List<StoredEvent>(events.Count);
 		foreach (var domainEvent in events)
 		{
 			var row = EventSerializer.Serialize(domainEvent);
 			_events.Add(row with { SequenceId = next++ });
+			appended.Add(domainEvent);
 		}
-		return Task.CompletedTask;
+
+		if (_bus is not null)
+			foreach (var domainEvent in appended)
+				await _bus.EmitAsync(domainEvent, ct);
 	}
 }
 

@@ -9,6 +9,5 @@ public class AuctionUpdated : StoredEvent
     public string? Title { get; set; }
     public string? Description { get; set; }
     public decimal? MinimumPrice { get; set; }
-    public DateTime? ClosureTime { get; set; }
     public bool? IsPublished { get; set; }
 }

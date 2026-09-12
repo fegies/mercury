@@ -50,21 +50,19 @@ As an admin, I want to create a new auction with a title, description, minimum p
 | `Title` | `string?` | New title, or null if unchanged. |
 | `Description` | `string?` | New description, or null if unchanged. |
 | `MinimumPrice` | `decimal?` | New minimum price, or null if unchanged. |
-| `ClosureTime` | `DateTime?` | New closure time, or null if unchanged. |
 
-All optional fields are nullable. Only the fields present (non-null) in the event represent changes. This keeps events minimal and allows consumers to distinguish intentional changes from unchanged values.
+All optional fields are nullable. Only the fields present (non-null) in the event represent changes. This keeps events minimal and allows consumers to distinguish intentional changes from unchanged values. Closure time changes use the dedicated `AuctionCloseExtended` event described below.
 
 ### Invariants
 
 - The target auction must not already be closed.
 - If `Title` is provided, it must be non-empty.
 - If `MinimumPrice` is provided, it must be greater than or equal to 0.
-- If `ClosureTime` is provided, it must be in the future.
 - Only users with the Admin role may update auctions.
 
 ### User Story
 
-As an admin, I want to edit the title, description, minimum price, or closure time of an open auction so that I can correct mistakes or adjust terms before bidding ends.
+As an admin, I want to edit the title, description, or minimum price of an open auction so that I can correct mistakes or adjust terms before bidding ends.
 
 ### Flow
 
@@ -72,6 +70,38 @@ As an admin, I want to edit the title, description, minimum price, or closure ti
 2. The backend resolves which fields have actually changed.
 3. An `AuctionUpdated` event is persisted with only the changed fields set.
 4. The frontend reflects the updated state on the auction detail page.
+
+---
+
+## Extending Auction Closure Time
+
+### Event
+
+`AuctionCloseExtended`
+
+| Field | Type | Description |
+|---|---|---|
+| `AuctionId` | `Guid` | The auction whose closure is being extended. |
+| `NewClosureTime` | `DateTime` | The new, later closure time. |
+
+### Invariants
+
+- The target auction must not already be closed.
+- `NewClosureTime` must be in the future.
+- `NewClosureTime` must be later than the current closure time. The closure date can only be extended, never moved earlier.
+- Only users with the Admin role may extend an auction's closure time.
+
+### User Story
+
+As an admin, I want to extend an auction's closing time so that bidders have more time to place bids. The closing date must always move forward; it cannot be shortened.
+
+### Flow
+
+1. Admin edits the auction-end date in the auction edit form.
+2. The frontend calls `POST /api/auctions/{id}/extend-close` with the new closure time.
+3. The backend validates that the new time is later than the current one.
+4. An `AuctionCloseExtended` event is persisted.
+5. The frontend reflects the extended closure time on the auction detail page.
 
 ---
 
@@ -182,11 +212,12 @@ As an admin, I want to close an auction before its scheduled end time so that bi
 Current auction state is derived by replaying events in `SequenceId` order:
 
 ```
-State = fold over [AuctionCreated, AuctionUpdated..., AuctionImagesAdded..., AuctionImagesRemoved..., AuctionClosed]
+State = fold over [AuctionCreated, AuctionUpdated..., AuctionCloseExtended..., AuctionImagesAdded..., AuctionImagesRemoved..., AuctionClosed]
 ```
 
 - After `AuctionCreated`: auction exists with initial field values.
 - After each `AuctionUpdated`: only the non-null fields are merged into the current state.
+- After each `AuctionCloseExtended`: the closure time is replaced with the (later) new closure time.
 - After `AuctionImagesAdded`: new images are appended to the image list.
 - After `AuctionImagesRemoved`: referenced images are removed from the image list.
 - After `AuctionClosed`: the auction is marked as closed and immutably frozen — no further updates, image changes, or bids are allowed.

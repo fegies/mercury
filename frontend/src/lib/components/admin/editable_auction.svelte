@@ -4,11 +4,15 @@
 	let {
 		model = $bindable(),
 		submit_label = 'Create Auction',
-		action = '?'
+		action = '?',
+		min_closure = null,
+		extend_only = false
 	}: {
 		model: AuctionSummary;
 		submit_label?: string;
 		action?: string;
+		min_closure?: string | null;
+		extend_only?: boolean;
 	} = $props();
 </script>
 
@@ -41,9 +45,14 @@
 			type="datetime-local"
 			class="input"
 			name="auction-end"
-			min={new Date().toISOString().slice(0, 16)}
+			min={new Date(min_closure ?? Date.now()).toISOString().slice(0, 16)}
 			value={new Date(model.closureTime).toISOString().slice(0, 16)}
 		/>
+		{#if extend_only}
+			<span class="text-surface-500 text-sm">
+				The auction end can only be extended; it cannot be moved closer.
+			</span>
+		{/if}
 	</label>
 
 	<label class="flex items-center gap-2">

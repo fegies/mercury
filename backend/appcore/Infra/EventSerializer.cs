@@ -23,6 +23,7 @@ public static class EventSerializer
 		["AuctionImagesAdded"] = typeof(AuctionImagesAdded),
 		["AuctionImagesRemoved"] = typeof(AuctionImagesRemoved),
 		["AuctionClosed"] = typeof(AuctionClosed),
+		["AuctionCloseExtended"] = typeof(AuctionCloseExtended),
 		["BidPlaced"] = typeof(BidPlaced),
 		["UserCreated"] = typeof(UserCreated),
 		["UserUpdated"] = typeof(UserUpdated),

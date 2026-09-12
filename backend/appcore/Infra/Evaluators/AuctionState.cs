@@ -36,8 +36,11 @@ public record AuctionState(
 			Title = updated.Title ?? state.Title,
 			Description = updated.Description ?? state.Description,
 			MinimumPrice = updated.MinimumPrice ?? state.MinimumPrice,
-			ClosureTime = updated.ClosureTime ?? state.ClosureTime,
 			IsPublished = updated.IsPublished ?? state.IsPublished,
+		},
+		AuctionCloseExtended extended => state with
+		{
+			ClosureTime = extended.NewClosureTime,
 		},
 		AuctionImagesAdded added => state with
 		{

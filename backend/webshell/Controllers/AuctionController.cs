@@ -39,8 +39,12 @@ public class AuctionController(
         public string? Title { get; init; }
         public string? Description { get; init; }
         public decimal? MinimumPrice { get; init; }
-        public DateTime? ClosureTime { get; init; }
         public bool? IsPublished { get; init; }
+    }
+
+    public record ExtendCloseRequest
+    {
+        public required DateTime ClosureTime { get; init; }
     }
 
     public record UploadImagesRequest
@@ -82,6 +86,7 @@ public class AuctionController(
 
     /// <summary>
     /// Updates the mutable fields of an auction. Closed auctions cannot be updated.
+    /// The closure time is updated via a dedicated extension endpoint below.
     /// </summary>
     [HttpPatch("{id}")]
     [Authorize(Policy = "IsAdmin")]
@@ -95,11 +100,31 @@ public class AuctionController(
             Title = request.Title,
             Description = request.Description,
             MinimumPrice = request.MinimumPrice,
-            ClosureTime = request.ClosureTime,
             IsPublished = request.IsPublished,
         };
 
         await updateAuctionHandler.Execute(updatedEvent, ct);
+
+        return NoContent();
+    }
+
+    /// <summary>
+    /// Extends the closure time of an open auction. The new closure time must be later than
+    /// the current one; the closure date can only be moved further out, never closer.
+    /// </summary>
+    [HttpPost("{id}/extend-close")]
+    [Authorize(Policy = "IsAdmin")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult> ExtendClose(IncomingEventHandler<AuctionCloseExtended, bool> extendCloseHandler, Guid id, [FromBody] ExtendCloseRequest request, CancellationToken ct)
+    {
+        var extendedEvent = new AuctionCloseExtended
+        {
+            AuctionId = id,
+            NewClosureTime = request.ClosureTime,
+        };
+
+        await extendCloseHandler.Execute(extendedEvent, ct);
 
         return NoContent();
     }

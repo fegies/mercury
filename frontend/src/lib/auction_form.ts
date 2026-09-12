@@ -63,7 +63,6 @@ export function selected_files(formData: FormData, name = 'images'): File[] {
 	return formData.getAll(name).filter((f): f is File => f instanceof File && f.size > 0);
 }
 
-
 export function to_auction(values: AuctionFormValues): AuctionSummary {
 	return {
 		id: '',

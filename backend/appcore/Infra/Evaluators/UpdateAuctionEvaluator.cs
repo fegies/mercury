@@ -23,9 +23,6 @@ public class UpdateAuctionEvaluator : IDecisionFunction<AuctionUpdated, bool>
 		if (input.MinimumPrice is { } price && price < 0)
 			throw new InvariantViolation("Minimum price must be non-negative.");
 
-		if (input.ClosureTime is { } closure && closure <= DateTime.UtcNow)
-			throw new InvariantViolation("Closure time must be in the future.");
-
 		return new DecisionStep<bool>.Complete(true, [input]);
 	}
 }

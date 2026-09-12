@@ -120,7 +120,7 @@
         "tags": [
           "Auction"
         ],
-        "summary": "Updates the mutable fields of an auction. Closed auctions cannot be updated.",
+        "summary": "Updates the mutable fields of an auction. Closed auctions cannot be updated.\nThe closure time is updated via a dedicated extension endpoint below.",
         "parameters": [
           {
             "name": "id",
@@ -217,6 +217,70 @@
           },
           "404": {
             "description": "Not Found",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auctions/{id}/extend-close": {
+      "post": {
+        "tags": [
+          "Auction"
+        ],
+        "summary": "Extends the closure time of an open auction. The new closure time must be later than\nthe current one; the closure date can only be moved further out, never closer.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExtendCloseRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExtendCloseRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExtendCloseRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "400": {
+            "description": "Bad Request",
             "content": {
               "text/plain": {
                 "schema": {
@@ -755,6 +819,18 @@
           }
         }
       },
+      "ExtendCloseRequest": {
+        "required": [
+          "closureTime"
+        ],
+        "type": "object",
+        "properties": {
+          "closureTime": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
       "IFormFile": {
         "type": "string",
         "format": "binary"
@@ -833,13 +909,6 @@
               "number"
             ],
             "format": "double"
-          },
-          "closureTime": {
-            "type": [
-              "null",
-              "string"
-            ],
-            "format": "date-time"
           },
           "isPublished": {
             "type": [

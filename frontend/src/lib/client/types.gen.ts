@@ -36,6 +36,10 @@ export type CreateAuctionRequest = {
     isPublished: boolean;
 };
 
+export type ExtendCloseRequest = {
+    closureTime: string;
+};
+
 export type IFormFile = Blob | File;
 
 /**
@@ -64,7 +68,6 @@ export type UpdateAuctionRequest = {
     title?: null | string;
     description?: null | string;
     minimumPrice?: null | number;
-    closureTime?: null | string;
     isPublished?: null | boolean;
 };
 
@@ -184,6 +187,33 @@ export type PatchApiAuctionsByIdResponses = {
 };
 
 export type PatchApiAuctionsByIdResponse = PatchApiAuctionsByIdResponses[keyof PatchApiAuctionsByIdResponses];
+
+export type PostApiAuctionsByIdExtendCloseData = {
+    body: ExtendCloseRequest;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/auctions/{id}/extend-close';
+};
+
+export type PostApiAuctionsByIdExtendCloseErrors = {
+    /**
+     * Bad Request
+     */
+    400: ProblemDetails;
+};
+
+export type PostApiAuctionsByIdExtendCloseError = PostApiAuctionsByIdExtendCloseErrors[keyof PostApiAuctionsByIdExtendCloseErrors];
+
+export type PostApiAuctionsByIdExtendCloseResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type PostApiAuctionsByIdExtendCloseResponse = PostApiAuctionsByIdExtendCloseResponses[keyof PostApiAuctionsByIdExtendCloseResponses];
 
 export type PostApiAuctionsByIdImagesData = {
     body: {

@@ -1,10 +1,6 @@
 import { error, fail } from '@sveltejs/kit';
 import { build_client } from '$lib/api';
-import {
-	parse_auction_form,
-	selected_files,
-	to_auction
-} from '$lib/auction_form';
+import { parse_auction_form, selected_files, to_auction } from '$lib/auction_form';
 import type { Actions, PageServerLoad, RequestEvent } from './$types';
 
 export const load: PageServerLoad = async (event) => {
@@ -32,19 +28,39 @@ export const actions = {
 
 		if (values && errors.length === 0) {
 			const client = build_client(event);
-			const { error: apiError, response } = await client.patchApiAuctionsById({
-				path: { id: event.params.id },
-				body: {
-					title: values.title,
-					description: values.description,
-					minimumPrice: values.minimumPrice,
-					closureTime: values.closureTime,
-					isPublished: values.isPublished
-				}
+			const { data: current } = await client.getApiAuctionsById({
+				path: { id: event.params.id }
 			});
 
-			if (apiError?.detail) {
-				errors.push(apiError.detail);
+			const closureChanged =
+				current !== undefined &&
+				new Date(values.closureTime).getTime() !== new Date(current.closureTime).getTime();
+
+			if (closureChanged) {
+				const { error: extendError } = await client.postApiAuctionsByIdExtendClose({
+					path: { id: event.params.id },
+					body: { closureTime: values.closureTime }
+				});
+
+				if (extendError?.detail) {
+					errors.push(extendError.detail);
+				}
+			}
+
+			if (errors.length === 0) {
+				const { error: apiError } = await client.patchApiAuctionsById({
+					path: { id: event.params.id },
+					body: {
+						title: values.title,
+						description: values.description,
+						minimumPrice: values.minimumPrice,
+						isPublished: values.isPublished
+					}
+				});
+
+				if (apiError?.detail) {
+					errors.push(apiError.detail);
+				}
 			}
 		}
 

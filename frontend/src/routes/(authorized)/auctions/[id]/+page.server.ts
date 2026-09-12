@@ -30,10 +30,7 @@ export const actions = {
 		}
 
 		const client = build_client(event);
-		const {
-			data,
-			error: apiError,
-		} = await client.postApiAuctionsByIdBid({
+		const { data, error: apiError } = await client.postApiAuctionsByIdBid({
 			path: { id: event.params.id },
 			body: { maximumAmount: values.maximumAmount }
 		});

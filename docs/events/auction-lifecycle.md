@@ -212,7 +212,7 @@ As an admin, I want to close an auction before its scheduled end time so that bi
 Current auction state is derived by replaying events in `SequenceId` order:
 
 ```
-State = fold over [AuctionCreated, AuctionUpdated..., AuctionCloseExtended..., AuctionImagesAdded..., AuctionImagesRemoved..., AuctionClosed]
+State = fold over [AuctionCreated, AuctionUpdated..., AuctionCloseExtended..., AuctionImagesAdded..., AuctionImagesRemoved..., AuctionClosed, AuctionCancelled]
 ```
 
 - After `AuctionCreated`: auction exists with initial field values.
@@ -221,5 +221,38 @@ State = fold over [AuctionCreated, AuctionUpdated..., AuctionCloseExtended..., A
 - After `AuctionImagesAdded`: new images are appended to the image list.
 - After `AuctionImagesRemoved`: referenced images are removed from the image list.
 - After `AuctionClosed`: the auction is marked as closed and immutably frozen — no further updates, image changes, or bids are allowed.
+- After `AuctionCancelled`: the auction is marked as closed **and** cancelled and immutably frozen — no further updates, image changes, bids, or closure are allowed.
 
-An auction that has received an `AuctionClosed` event is considered terminal. All mutation operations must check for this state and reject changes with an appropriate error.
+An auction that has received an `AuctionClosed` or `AuctionCancelled` event is considered terminal. All mutation operations must check for this state and reject changes with an appropriate error.
+
+---
+
+## Auction Cancellation
+
+### Event
+
+`AuctionCancelled`
+
+| Field | Type | Description |
+|---|---|---|
+| `AuctionId` | `Guid` | The auction being cancelled. |
+
+### Invariants
+
+- The target auction must not already be closed.
+- Only users with the Admin role may cancel an auction.
+- Cancellation does not compute a winner or a winning price; the auction is simply closed with no winner.
+
+### User Story
+
+As an admin, I want to cancel an open auction so that the sale is abandoned entirely and bidding stops immediately, without declaring a winner.
+
+### Flow
+
+1. Admin triggers cancellation on an open auction.
+2. An `AuctionCancelled` event is persisted.
+3. The auction is marked as closed **and** cancelled (`IsClosed = true`, `IsCancelled = true`) in all subsequent queries. No winner fields are set.
+
+### State Reconstruction
+
+An auction that has received an `AuctionCancelled` event is terminal. Unlike `AuctionClosed`, cancellation never fills in `WinnerUserId` or `WinningPrice`.

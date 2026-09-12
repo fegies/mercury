@@ -10,6 +10,7 @@ export function default_auction(): AuctionSummary {
 		minimumPrice: 0,
 		closureTime: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
 		isClosed: false,
+		isCancelled: false,
 		isPublished: false,
 		imageUrls: [],
 		currentBid: null

@@ -145,6 +145,7 @@ describe('to_auction', () => {
 		expect(auction).toEqual({
 			id: '',
 			isClosed: false,
+			isCancelled: false,
 			isPublished: true,
 			imageUrls: [],
 			currentBid: null,

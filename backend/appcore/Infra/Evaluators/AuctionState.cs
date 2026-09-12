@@ -10,6 +10,7 @@ public record AuctionState(
 	decimal MinimumPrice,
 	DateTime ClosureTime,
 	bool IsClosed,
+	bool IsCancelled,
 	bool IsPublished,
 	List<AuctionImageRef> Images,
 	Guid? HighestBidderId,
@@ -55,6 +56,11 @@ public record AuctionState(
 			IsClosed = true,
 			WinnerUserId = closed.WinnerUserId,
 			WinningPrice = closed.WinningPrice,
+		},
+		AuctionCancelled cancelled => state with
+		{
+			IsClosed = true,
+			IsCancelled = true,
 		},
 		BidPlaced bid => IncorporateBid(state, bid.BidderId, bid.MaximumAmount),
 		_ => state,
@@ -109,6 +115,7 @@ public record AuctionState(
 		MinimumPrice: 0m,
 		ClosureTime: DateTime.MaxValue,
 		IsClosed: false,
+		IsCancelled: false,
 		IsPublished: true,
 		Images: [],
 		HighestBidderId: null,

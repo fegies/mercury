@@ -27,6 +27,7 @@ public static class StartupExtension
         builder.Services.AddScoped<IDecisionFunction<AuctionClosed, bool>, CloseAuctionEvaluator>(sp =>
             new CloseAuctionEvaluator(sp.GetRequiredService<AuctionConfig>()));
         builder.Services.AddScoped<IDecisionFunction<AuctionCloseExtended, bool>, ExtendAuctionCloseEvaluator>();
+        builder.Services.AddScoped<IDecisionFunction<AuctionCancelled, bool>, CancelAuctionEvaluator>();
         builder.Services.AddScoped<IDecisionFunction<AuctionImagesAdded, bool>, AddImagesEvaluator>();
         builder.Services.AddScoped<IDecisionFunction<BidPlaced, BidResult>, PlaceBidEvaluator>(sp =>
             new PlaceBidEvaluator(sp.GetRequiredService<AuctionConfig>().MinBidIncrement));
@@ -37,6 +38,7 @@ public static class StartupExtension
         builder.Services.AddScoped<IncomingEventHandler<AuctionImagesRemoved, bool>>();
         builder.Services.AddScoped<IncomingEventHandler<AuctionClosed, bool>>();
         builder.Services.AddScoped<IncomingEventHandler<AuctionCloseExtended, bool>>();
+        builder.Services.AddScoped<IncomingEventHandler<AuctionCancelled, bool>>();
         builder.Services.AddScoped<IncomingEventHandler<AuctionImagesAdded, bool>>();
         builder.Services.AddScoped<IncomingEventHandler<BidPlaced, BidResult>>();
         builder.Services.AddScoped<IncomingEventHandler<ProvisionUserInput, UserProvisionResult>>();

@@ -11,6 +11,7 @@ export type AuctionSummary = {
     minimumPrice: number;
     closureTime: string;
     isClosed: boolean;
+    isCancelled: boolean;
     isPublished: boolean;
     imageUrls: Array<string>;
     currentBid?: null | number;
@@ -298,6 +299,33 @@ export type PostApiAuctionsByIdCloseResponses = {
 };
 
 export type PostApiAuctionsByIdCloseResponse = PostApiAuctionsByIdCloseResponses[keyof PostApiAuctionsByIdCloseResponses];
+
+export type PostApiAuctionsByIdCancelData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/auctions/{id}/cancel';
+};
+
+export type PostApiAuctionsByIdCancelErrors = {
+    /**
+     * Bad Request
+     */
+    400: ProblemDetails;
+};
+
+export type PostApiAuctionsByIdCancelError = PostApiAuctionsByIdCancelErrors[keyof PostApiAuctionsByIdCancelErrors];
+
+export type PostApiAuctionsByIdCancelResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type PostApiAuctionsByIdCancelResponse = PostApiAuctionsByIdCancelResponses[keyof PostApiAuctionsByIdCancelResponses];
 
 export type PostApiAuctionsByIdBidData = {
     body: BidRequest;

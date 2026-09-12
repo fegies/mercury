@@ -195,6 +195,55 @@ public class AuctionServiceTests
 		var state = await service.GetAuctionState(auctionId);
 
 		Assert.True(state.IsClosed);
+		Assert.False(state.IsCancelled);
+	}
+
+	[Fact]
+	public async Task GetAuctionState_IncorporatesCancelled()
+	{
+		var auctionId = Guid.NewGuid();
+		var created = CreateCreatedEvent(auctionId);
+		var cancelled = new AuctionCancelled
+		{
+			AuctionId = auctionId,
+		};
+		var store = new InMemoryEventStore([
+			EventSerializer.Serialize(created),
+			EventSerializer.Serialize(cancelled),
+		]);
+		var service = new AuctionService(store, new AuctionConfig());
+
+		var state = await service.GetAuctionState(auctionId);
+
+		Assert.True(state.IsClosed);
+		Assert.True(state.IsCancelled);
+	}
+
+	[Fact]
+	public async Task GetAuctionState_LaterCloseDoesNotResetCancellation()
+	{
+		var auctionId = Guid.NewGuid();
+		var created = CreateCreatedEvent(auctionId);
+		var cancelled = new AuctionCancelled
+		{
+			AuctionId = auctionId,
+		};
+		var closed = new AuctionClosed
+		{
+			AuctionId = auctionId,
+			Reason = AuctionCloseReason.Expired,
+		};
+		var store = new InMemoryEventStore([
+			EventSerializer.Serialize(created) with { SequenceId = 1 },
+			EventSerializer.Serialize(cancelled) with { SequenceId = 2 },
+			EventSerializer.Serialize(closed) with { SequenceId = 3 },
+		]);
+		var service = new AuctionService(store, new AuctionConfig());
+
+		var state = await service.GetAuctionState(auctionId);
+
+		Assert.True(state.IsClosed);
+		Assert.True(state.IsCancelled);
 	}
 
 	[Fact]
@@ -305,6 +354,51 @@ public class AuctionServiceTests
 		var summary = await service.GetAuctionSummary(Guid.NewGuid());
 
 		Assert.Null(summary);
+	}
+
+	[Fact]
+	public async Task GetAuctionSummary_CancelledAuction_IsCancelledTrue()
+	{
+		var auctionId = Guid.NewGuid();
+		var created = CreateCreatedEvent(auctionId);
+		var cancelled = new AuctionCancelled
+		{
+			AuctionId = auctionId,
+		};
+		var store = new InMemoryEventStore([
+			EventSerializer.Serialize(created),
+			EventSerializer.Serialize(cancelled),
+		]);
+		var service = new AuctionService(store, new AuctionConfig());
+
+		var summary = await service.GetAuctionSummary(auctionId);
+
+		Assert.NotNull(summary);
+		Assert.True(summary.IsClosed);
+		Assert.True(summary.IsCancelled);
+	}
+
+	[Fact]
+	public async Task GetAuctionSummary_NormallyClosedAuction_IsNotCancelled()
+	{
+		var auctionId = Guid.NewGuid();
+		var created = CreateCreatedEvent(auctionId);
+		var closed = new AuctionClosed
+		{
+			AuctionId = auctionId,
+			Reason = AuctionCloseReason.Manual,
+		};
+		var store = new InMemoryEventStore([
+			EventSerializer.Serialize(created),
+			EventSerializer.Serialize(closed),
+		]);
+		var service = new AuctionService(store, new AuctionConfig());
+
+		var summary = await service.GetAuctionSummary(auctionId);
+
+		Assert.NotNull(summary);
+		Assert.True(summary.IsClosed);
+		Assert.False(summary.IsCancelled);
 	}
 
 	[Fact]

@@ -128,5 +128,20 @@ export const actions = {
 		}
 
 		return { success: true };
+	},
+
+	cancel: async (event: RequestEvent) => {
+		await event.locals.authorize('Admin');
+
+		const client = build_client(event);
+		const { error: apiError } = await client.postApiAuctionsByIdCancel({
+			path: { id: event.params.id }
+		});
+
+		if (apiError) {
+			return fail(400, { errors: [apiError] });
+		}
+
+		return { success: true };
 	}
 } satisfies Actions;

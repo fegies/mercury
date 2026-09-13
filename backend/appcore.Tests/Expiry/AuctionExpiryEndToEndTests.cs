@@ -24,7 +24,7 @@ public class AuctionExpiryEndToEndTests
 	public async Task CreateBidThenExpireClosesTheAuctionWithWinnerAndPrice()
 	{
 		var clock = new FakeTimeProvider(DateTimeOffset.UtcNow);
-		var bus = new InMemoryAppBus();
+		var bus = new InMemoryAppBus(NullLogger<InMemoryAppBus>.Instance);
 		var store = new InMemoryEventStore(bus: bus);
 		var provider = new ServiceCollection()
 			.AddSingleton<IEventStore>(store)

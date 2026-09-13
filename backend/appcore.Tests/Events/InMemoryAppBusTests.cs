@@ -1,4 +1,5 @@
 using appcore.Infra.Events;
+using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
 namespace appcore.Tests.Events;
@@ -17,7 +18,7 @@ public class InMemoryAppBusTests
 	[Fact]
 	public async Task EmitsToExactTypeSubscriber()
 	{
-		var bus = new InMemoryAppBus();
+		var bus = new InMemoryAppBus(NullLogger<InMemoryAppBus>.Instance);
 		var received = new List<string>();
 		using (bus.Subscribe<SampleMessage>((m, _) => { received.Add(m.Value); return ValueTask.CompletedTask; }))
 		{
@@ -32,7 +33,7 @@ public class InMemoryAppBusTests
 	[Fact]
 	public async Task DerivedMessageReachesBaseTypeSubscriber()
 	{
-		var bus = new InMemoryAppBus();
+		var bus = new InMemoryAppBus(NullLogger<InMemoryAppBus>.Instance);
 		var received = new List<string>();
 		using (bus.Subscribe<SampleBase>((m, _) => { received.Add(m.Value); return ValueTask.CompletedTask; }))
 		{
@@ -47,7 +48,7 @@ public class InMemoryAppBusTests
 	[Fact]
 	public async Task EmitsToInterfaceSubscriber()
 	{
-		var bus = new InMemoryAppBus();
+		var bus = new InMemoryAppBus(NullLogger<InMemoryAppBus>.Instance);
 		var received = new List<string>();
 		using (bus.Subscribe<ISampleMarker>((m, _) => { received.Add(((SampleMessage)m).Value); return ValueTask.CompletedTask; }))
 		{
@@ -62,7 +63,7 @@ public class InMemoryAppBusTests
 	[Fact]
 	public async Task ObjectSubscriberReceivesEverything()
 	{
-		var bus = new InMemoryAppBus();
+		var bus = new InMemoryAppBus(NullLogger<InMemoryAppBus>.Instance);
 		var received = new List<string>();
 		using (bus.Subscribe<object>((m, _) => { received.Add(m.GetType().Name); return ValueTask.CompletedTask; }))
 		{
@@ -77,7 +78,7 @@ public class InMemoryAppBusTests
 	[Fact]
 	public async Task BothExactAndBaseSubscribersFire()
 	{
-		var bus = new InMemoryAppBus();
+		var bus = new InMemoryAppBus(NullLogger<InMemoryAppBus>.Instance);
 		var exact = 0;
 		var derivedBase = 0;
 		using (bus.Subscribe<SampleMessage>((_, _) => { exact++; return ValueTask.CompletedTask; }))
@@ -95,7 +96,7 @@ public class InMemoryAppBusTests
 	[Fact]
 	public async Task HandlersRunInRegistrationOrder()
 	{
-		var bus = new InMemoryAppBus();
+		var bus = new InMemoryAppBus(NullLogger<InMemoryAppBus>.Instance);
 		var received = new List<string>();
 		using (bus.Subscribe<SampleMessage>((m, _) => { received.Add(m.Value + "1"); return ValueTask.CompletedTask; }))
 		using (bus.Subscribe<SampleMessage>((m, _) => { received.Add(m.Value + "2"); return ValueTask.CompletedTask; }))
@@ -111,7 +112,7 @@ public class InMemoryAppBusTests
 	[Fact]
 	public async Task PreservesFifoOrderAcrossMultipleEmissions()
 	{
-		var bus = new InMemoryAppBus();
+		var bus = new InMemoryAppBus(NullLogger<InMemoryAppBus>.Instance);
 		var received = new List<string>();
 		using (bus.Subscribe<SampleMessage>((m, _) => { received.Add(m.Value); return ValueTask.CompletedTask; }))
 		{
@@ -128,7 +129,7 @@ public class InMemoryAppBusTests
 	[Fact]
 	public async Task HandlerFailureDoesNotPreventOtherHandlersOrMessages()
 	{
-		var bus = new InMemoryAppBus();
+		var bus = new InMemoryAppBus(NullLogger<InMemoryAppBus>.Instance);
 		var healthy = new List<string>();
 		using (bus.Subscribe<SampleMessage>((_, _) => throw new InvalidOperationException("boom")))
 		using (bus.Subscribe<SampleMessage>((m, _) => { healthy.Add(m.Value); return ValueTask.CompletedTask; }))
@@ -145,7 +146,7 @@ public class InMemoryAppBusTests
 	[Fact]
 	public async Task UnsubscribingStopsDelivery()
 	{
-		var bus = new InMemoryAppBus();
+		var bus = new InMemoryAppBus(NullLogger<InMemoryAppBus>.Instance);
 		var received = new List<string>();
 		var beforeArrived = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
 		var subscription = bus.Subscribe<SampleMessage>((m, _) =>
@@ -169,7 +170,7 @@ public class InMemoryAppBusTests
 	[Fact]
 	public async Task StopDrainsQueuedMessages()
 	{
-		var bus = new InMemoryAppBus();
+		var bus = new InMemoryAppBus(NullLogger<InMemoryAppBus>.Instance);
 		var received = new List<string>();
 		using (bus.Subscribe<SampleMessage>((m, _) => { received.Add(m.Value); return ValueTask.CompletedTask; }))
 		{

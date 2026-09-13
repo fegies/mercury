@@ -17,7 +17,7 @@ public class AuctionExpiryWorkerTests
 {
 	private readonly FakeTimeProvider _clock = new();
 	private readonly InMemoryEventStore _store = new();
-	private readonly InMemoryAppBus _bus = new();
+	private readonly InMemoryAppBus _bus = new(NullLogger<InMemoryAppBus>.Instance);
 	private readonly IServiceScopeFactory _scopeFactory;
 
 	public AuctionExpiryWorkerTests()

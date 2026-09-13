@@ -134,8 +134,8 @@ public class DbEventStore(NpgsqlDataSource _datasource, IAppBus? _bus = null) : 
 		// The commit succeeded (the batch is BEGIN..COMMIT in one roundtrip); wake any in-memory
 		// consumers with the typed events so they can react without polling the durable log again.
 		if (_bus is not null)
-			foreach (var row in serialized)
-				await _bus.EmitAsync(EventSerializer.Deserialize(row), ct);
+			foreach (var domainEvent in events)
+				await _bus.EmitAsync(domainEvent, ct);
 	}
 
 	private static (string Sql, List<NpgsqlParameter> Parameters) BuildBoundaryPredicate(IReadOnlyList<EventSelector> boundary)

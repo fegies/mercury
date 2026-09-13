@@ -3,6 +3,7 @@ using appcore.Entities.Events;
 using appcore.Infra;
 using appcore.Infra.Events;
 using appcore.Infra.Evaluators;
+using appcore.Telemetry;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -102,18 +103,15 @@ public sealed class AuctionExpiryWorker : BackgroundService
 		try
 		{
 			await handler.Execute(close, ct);
-			_logger.LogInformation("Auto-closed auction {AuctionId} after its closure time.", elapsed.AuctionId);
+			_logger.AutoClosedAuction(elapsed.AuctionId);
 		}
 		catch (InvariantViolation ex)
 		{
-			_logger.LogInformation(
-				"Auction {AuctionId} was not auto-closed: {Message}",
-				elapsed.AuctionId,
-				ex.Message);
+			_logger.AutoCloseNotApplied(elapsed.AuctionId, ex.Message);
 		}
 		catch (InvalidOperationException ex)
 		{
-			_logger.LogError(ex, "Auction {AuctionId} could not be auto-closed after exhausting retries.", elapsed.AuctionId);
+			_logger.AutoCloseFailed(elapsed.AuctionId, ex);
 		}
 	}
 
@@ -123,7 +121,9 @@ public sealed class AuctionExpiryWorker : BackgroundService
 		{
 			using var scope = _scopeFactory.CreateScope();
 			var reader = scope.ServiceProvider.GetRequiredService<IEventReader>();
-			var context = await reader.Read([new EventSelector(EventTypeNames.Auction, [])], ct);
+			// Only the lifecycle events that move the closing time matter here: create
+			// sets it, close/cancel retire the auction, extend pushes it out.
+			var context = await reader.Read([EventSelector.OfTypes(EventTypeNames.AuctionClosure)], ct);
 
 			var states = context.Fold(new Dictionary<Guid, AuctionState>(), (acc, e) =>
 			{
@@ -143,12 +143,12 @@ public sealed class AuctionExpiryWorker : BackgroundService
 				open++;
 			}
 
-			_logger.LogInformation("Reconciled {OpenAuctionCount} open auction(s) at startup.", open);
+			_logger.ReconciledOpenAuctions(open);
 		}
 		catch (Exception ex)
 		{
 			// Startup reconciliation is best-effort; a failure must not bring the worker down.
-			_logger.LogError(ex, "Startup reconciliation of open auctions failed.");
+			_logger.StartupReconciliationFailed(ex);
 		}
 	}
 

@@ -1,8 +1,8 @@
 using System.Collections.Frozen;
 using System.Threading.Channels;
+using appcore.Telemetry;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Logging.Abstractions;
 
 namespace appcore.Infra.Events;
 
@@ -21,9 +21,9 @@ public sealed class InMemoryAppBus : IAppBus, IHostedService
 	private Task? _pump;
 	private bool _started;
 
-	public InMemoryAppBus(ILogger<InMemoryAppBus>? logger = null)
+	public InMemoryAppBus(ILogger<InMemoryAppBus> logger)
 	{
-		_logger = logger ?? NullLogger<InMemoryAppBus>.Instance;
+		_logger = logger;
 	}
 
 	public IDisposable Subscribe<TMessage>(Func<TMessage, CancellationToken, ValueTask> handler)
@@ -32,14 +32,30 @@ public sealed class InMemoryAppBus : IAppBus, IHostedService
 		var boxed = new Subscription((message, ct) => handler((TMessage)message, ct));
 
 		lock (_subscription_modification_lock)
-			_subscribers = Swap(_subscribers, typeof(TMessage), bucket => bucket.Append(boxed).ToArray());
+		{
+			var updated = _subscribers.TryGetValue(typeof(TMessage), out var existing)
+				? existing.Append(boxed).ToArray()
+				: [boxed];
+			_subscribers = new Dictionary<Type, Subscription[]>(_subscribers)
+			{
+				[typeof(TMessage)] = updated,
+			}.ToFrozenDictionary();
+		}
 
 		return new Unsubscriber(() =>
 		{
 			lock (_subscription_modification_lock)
 			{
-				if (_subscribers.TryGetValue(typeof(TMessage), out var current) && current.Contains(boxed))
-					_subscribers = Swap(_subscribers, typeof(TMessage), bucket => bucket.Where(s => s != boxed).ToArray());
+				if (!_subscribers.TryGetValue(typeof(TMessage), out var current) || !current.Contains(boxed))
+					return;
+
+				var updated = new Dictionary<Type, Subscription[]>(_subscribers);
+				var remaining = current.Where(s => s != boxed).ToArray();
+				if (remaining.Length == 0)
+					updated.Remove(typeof(TMessage));
+				else
+					updated[typeof(TMessage)] = remaining;
+				_subscribers = updated.ToFrozenDictionary();
 			}
 		});
 	}
@@ -96,28 +112,11 @@ public sealed class InMemoryAppBus : IAppBus, IHostedService
 					}
 					catch (Exception ex)
 					{
-						_logger.LogError(ex, "AppBus handler for {MessageType} failed.", ancestor.Name);
+						_logger.AppBusHandlerFailed(ancestor.Name, ex);
 					}
 				}
 			}
 		}
-	}
-
-	private static FrozenDictionary<Type, Subscription[]> Swap(
-		FrozenDictionary<Type, Subscription[]> current,
-		Type type,
-		Func<Subscription[], Subscription[]> update)
-	{
-		var next = update(current.TryGetValue(type, out var existing) ? existing : []);
-		if (next.Length == 0 && !current.ContainsKey(type))
-			return current;
-
-		var builder = new Dictionary<Type, Subscription[]>(current);
-		if (next.Length == 0)
-			builder.Remove(type);
-		else
-			builder[type] = next;
-		return builder.ToFrozenDictionary();
 	}
 
 	private static Type[] AncestorChainOf(Type type)

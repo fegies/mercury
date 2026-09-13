@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using System.Threading.Channels;
 
@@ -14,11 +15,11 @@ namespace appcore.Infra.Expiry;
 /// </summary>
 public sealed class AuctionDeadlineScheduler(TimeProvider timeProvider)
 {
-	public static readonly TimeSpan DelayCap = TimeSpan.FromHours(24);
+	private static readonly TimeSpan DelayCap = TimeSpan.FromHours(24);
 
 	private readonly Lock _lock = new();
 	private readonly Dictionary<Guid, DateTime> _deadlines = [];
-	private readonly PriorityQueue<(Guid AuctionId, DateTime Deadline), DateTime> _heap = new();
+	private readonly PriorityQueue<Guid, DateTime> _heap = new();
 	private readonly Channel<bool> _changed = Channel.CreateBounded<bool>(new BoundedChannelOptions(1)
 	{
 		FullMode = BoundedChannelFullMode.DropWrite,
@@ -36,7 +37,7 @@ public sealed class AuctionDeadlineScheduler(TimeProvider timeProvider)
 		lock (_lock)
 		{
 			_deadlines[auctionId] = deadline;
-			_heap.Enqueue((auctionId, deadline), deadline);
+			_heap.Enqueue(auctionId, deadline);
 		}
 		_changed.Writer.TryWrite(true);
 	}
@@ -59,12 +60,8 @@ public sealed class AuctionDeadlineScheduler(TimeProvider timeProvider)
 	{
 		while (!ct.IsCancellationRequested)
 		{
-			var due = TryGetDue();
-			if (due is not null)
-			{
+			while (TryGetNextDue(out var due))
 				yield return due;
-				continue;
-			}
 
 			try
 			{
@@ -89,28 +86,27 @@ public sealed class AuctionDeadlineScheduler(TimeProvider timeProvider)
 		ct.ThrowIfCancellationRequested();
 	}
 
-	private AuctionExpiryElapsed? TryGetDue()
+	private bool TryGetNextDue([NotNullWhen(true)] out AuctionExpiryElapsed? res)
 	{
+		res = null;
 		var now = timeProvider.GetUtcNow().UtcDateTime;
 
 		lock (_lock)
 		{
-			while (_heap.Count > 0)
+			while (_heap.TryPeek(out var auction_id, out var deadline))
 			{
-				var (auctionId, deadline) = _heap.Peek();
-				if (_deadlines.TryGetValue(auctionId, out var current) && current == deadline)
-				{
-					if (deadline <= now)
-					{
-						_heap.Dequeue();
-						_deadlines.Remove(auctionId);
-						return new AuctionExpiryElapsed(auctionId, deadline);
-					}
-					return null;
-				}
+				if (deadline > now)
+					return false; // nothing to schedule yet.
+
 				_heap.Dequeue();
+				if (_deadlines.TryGetValue(auction_id, out var current_deadline) && current_deadline == deadline)
+				{
+					_deadlines.Remove(auction_id);
+					res = new AuctionExpiryElapsed(auction_id, deadline);
+					return true;
+				}
 			}
-			return null;
+			return false;
 		}
 	}
 
@@ -120,19 +116,17 @@ public sealed class AuctionDeadlineScheduler(TimeProvider timeProvider)
 
 		lock (_lock)
 		{
-			while (_heap.Count > 0)
-			{
-				var (auctionId, deadline) = _heap.Peek();
-				if (_deadlines.TryGetValue(auctionId, out var current) && current == deadline)
-				{
-					var untilDeadline = deadline - now;
-					if (untilDeadline < TimeSpan.Zero)
-						return TimeSpan.Zero;
-					return untilDeadline > DelayCap ? DelayCap : untilDeadline;
-				}
-				_heap.Dequeue();
-			}
-			return DelayCap;
+			if (!_heap.TryPeek(out var _, out var deadline))
+				return Timeout.InfiniteTimeSpan;
+
+			if (deadline <= now)
+				return TimeSpan.Zero;
+
+			var ts = deadline - now;
+			if (ts > DelayCap)
+				return DelayCap;
+
+			return ts;
 		}
 	}
 }

@@ -14,8 +14,10 @@
 # validates end-to-end against http://localhost:
 #   1. everything started correctly
 #   2. the OIDC login flow completes (a real browser follows every redirect)
-#   3. an admin creates an auction
+#   3. an admin creates an auction (with a near-term closing time)
 #   4. a bid is placed
+#   5. the closing time passes and the auction auto-closes (the browser sees
+#      the backend's expired close reflected on the auction page)
 #
 # Run with:
 #   nix build .#tests.<system>.integration

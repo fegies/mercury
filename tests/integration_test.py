@@ -5,13 +5,17 @@
 # through the complete user journey:
 #   1. log in through the mock OIDC provider (the browser follows the whole
 #      signin redirect chain on its own)
-#   2. create an auction as the admin
+#   2. create an auction as the admin, with a near-term closing time
 #   3. place a bid on the freshly created auction
+#   4. let the closing time pass and observe the auction auto-close (the
+#      backend's expiry machinery appends an expired close; the browser then
+#      shows the auction as Closed)
 #
 # A non-zero exit code makes the NixOS test fail.
 
 import re
 import sys
+import time
 from datetime import datetime, timedelta, timezone
 
 from playwright.sync_api import sync_playwright, expect
@@ -52,16 +56,26 @@ def main() -> int:
             expect(page.get_by_role("heading", name="Auctions")).to_be_visible()
 
             # --- 2. Create an auction --------------------------
+            # Close in a near-term, whole-minute future so the auto-close
+            # machinery can be exercised without waiting hours. Round up to
+            # the next minute and add one more: the auction stays open for
+            # at least 60s and at most ~120s.
+            now_local = datetime.now()
+            next_minute = (now_local + timedelta(minutes=1)).replace(
+                second=0, microsecond=0
+            )
+            closes_at = next_minute + timedelta(minutes=1)
+            closes_at_utc = closes_at.astimezone(timezone.utc)
+
             page.goto(BASE + "/manage-auctions/new", wait_until="domcontentloaded")
             page.locator('input[name="name"]').fill("Test Auction")
             page.locator('textarea[name="description"]').fill(
                 "Created by the integration test"
             )
             page.locator('input[name="min-price"]').fill("5")
-            future = (
-                datetime.now(timezone.utc) + timedelta(hours=2)
-            ).strftime("%Y-%m-%dT%H:%M")
-            page.locator('input[name="auction-end"]').fill(future)
+            page.locator('input[name="auction-end"]').fill(
+                closes_at.strftime("%Y-%m-%dT%H:%M")
+            )
             page.locator('input[name="published"]').check()
             page.get_by_role("button", name="Create Auction").click()
 
@@ -87,6 +101,35 @@ def main() -> int:
             expect(page.get_by_text("Bid placed.")).to_be_visible(timeout=30000)
             expect(page.get_by_text("You are the highest bidder")).to_be_visible()
             expect(page.get_by_text("€42.00")).to_be_visible()
+            # The auction is still open (the close is at least ~55s away).
+            expect(page.get_by_role("heading", name="Place a bid")).to_be_visible()
+
+            # --- 4. Auto-close on expiry -----------------------
+            # Wait until a little past the closing time, then poll for the
+            # Closed state. The backend's expired-close path needs a small
+            # amount of wall-clock time to fire after the deadline passes.
+            remaining = (closes_at_utc - datetime.now(timezone.utc)).total_seconds()
+            time.sleep(max(remaining, 5) + 5)
+
+            reload_until = time.monotonic() + 60
+            closed_seen = False
+            while time.monotonic() < reload_until:
+                page.reload(wait_until="domcontentloaded")
+                if page.get_by_text("Closed", exact=True).count() > 0:
+                    closed_seen = True
+                    break
+                time.sleep(2)
+
+            if not closed_seen:
+                print("AUTO-CLOSE-FAILURE url=", page.url)
+                print("AUTO-CLOSE-FAILURE title=", page.title())
+                print(page.content())
+                msg = "auction did not auto-close after its closing time"
+                raise AssertionError(msg)
+
+            # The public auction page replaced the bid form with the Closed badge.
+            expect(page.get_by_text("Closed", exact=True)).to_be_visible()
+            expect(page.get_by_role("heading", name="Place a bid")).not_to_be_visible()
 
             print(f"SUCCESS auction_id={auction_id}")
             return 0

@@ -127,10 +127,9 @@ public sealed class AuctionExpiryWorker : BackgroundService
 
 			var states = context.Fold(new Dictionary<Guid, AuctionState>(), (acc, e) =>
 			{
-				var auctionId = AuctionIdOf(e);
-				if (auctionId is null)
+				if (e is not AuctionEvent auction)
 					return acc;
-				acc[auctionId.Value] = AuctionState.Incorporate(acc.GetValueOrDefault(auctionId.Value, AuctionState.Empty), e);
+				acc[auction.AuctionId] = AuctionState.Incorporate(acc.GetValueOrDefault(auction.AuctionId, AuctionState.Empty), e);
 				return acc;
 			});
 
@@ -151,17 +150,4 @@ public sealed class AuctionExpiryWorker : BackgroundService
 			_logger.StartupReconciliationFailed(ex);
 		}
 	}
-
-	private static Guid? AuctionIdOf(StoredEvent e) => e switch
-	{
-		AuctionCreated a => a.AuctionId,
-		AuctionUpdated a => a.AuctionId,
-		AuctionImagesAdded a => a.AuctionId,
-		AuctionImagesRemoved a => a.AuctionId,
-		AuctionClosed a => a.AuctionId,
-		AuctionCloseExtended a => a.AuctionId,
-		AuctionCancelled a => a.AuctionId,
-		BidPlaced a => a.AuctionId,
-		_ => null,
-	};
 }

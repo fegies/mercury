@@ -2,7 +2,6 @@ using System;
 
 namespace appcore.Entities.Events;
 
-public class AuctionCancelled : StoredEvent
+public class AuctionCancelled : AuctionEvent
 {
-    public required Guid AuctionId { get; set; }
 }

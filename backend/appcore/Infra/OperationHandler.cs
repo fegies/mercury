@@ -18,6 +18,7 @@ public static class EventTypeNames
 	public const string UserRoleChanged = nameof(Entities.Events.UserRoleChanged);
 
 	public static readonly string[] Auction = [AuctionCreated, AuctionUpdated, AuctionImagesAdded, AuctionImagesRemoved, AuctionClosed, AuctionCloseExtended, AuctionCancelled, BidPlaced];
+	public static readonly string[] AuctionClosure = [AuctionCreated, AuctionClosed, AuctionCloseExtended, AuctionCancelled];
 	public static readonly string[] User = [UserCreated, UserUpdated, UserRoleChanged];
 
 	public static EventSelector ForOidIdentity(string issuer, string subject)

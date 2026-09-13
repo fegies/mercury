@@ -1,7 +1,9 @@
 using appcore.Configuration;
 using appcore.Entities.Events;
 using appcore.Infra;
+using appcore.Infra.Events;
 using appcore.Infra.Evaluators;
+using appcore.Infra.Expiry;
 using appcore.Services;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -20,6 +22,15 @@ public static class StartupExtension
         builder.Services.AddSingleton<EventHandlerOptions>();
         builder.Services.AddScoped<AuctionService>();
         builder.Services.AddScoped<UserService>();
+
+        // In-memory event bus (non-persistent wakeup index) and its hosted pump.
+        builder.Services.AddSingleton<InMemoryAppBus>();
+        builder.Services.AddSingleton<IAppBus>(sp => sp.GetRequiredService<InMemoryAppBus>());
+        builder.Services.AddSingleton<IHostedService>(sp => sp.GetRequiredService<InMemoryAppBus>());
+        builder.Services.AddSingleton(TimeProvider.System);
+
+        // Auto-closes auctions once their closure time passes.
+        builder.Services.AddHostedService<AuctionExpiryWorker>();
 
         builder.Services.AddScoped<IDecisionFunction<AuctionCreated, Guid>, CreateAuctionEvaluator>();
         builder.Services.AddScoped<IDecisionFunction<AuctionUpdated, bool>, UpdateAuctionEvaluator>();

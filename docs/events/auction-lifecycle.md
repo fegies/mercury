@@ -201,9 +201,15 @@ As an admin, I want to close an auction before its scheduled end time so that bi
 
 #### Automatic Closure
 
-1. A background process checks for auctions past their `ClosureTime`.
-2. An `AuctionClosed` event is persisted with `Reason = Expired`.
+1. When an auction is created or its closure is extended, an `AuctionExpiryElapsed` deadline is (re)scheduled in the in-process scheduler. Closing or cancelling an auction removes its deadline.
+2. The `AuctionExpiryWorker` background service consumes the timeline and, once an `AuctionClosed` event for the auction was never committed, an `AuctionClosed` event is persisted with `Reason = Expired`.
 3. The auction is marked as closed in all subsequent queries.
+
+Implementation notes:
+
+- The scheduler is **not** the source of truth. It is an in-memory, loss-tolerant wakeup index: expiry yields (`AuctionExpiryElapsed`) only tell the worker to *check* the log, and the close itself is a normal, conflict-guarded store append. A missed signal is recovered on the next process start, when the worker re-reads all auction events and re-arms deadlines for open auctions.
+- Deadlines further than 24h ahead are handled by re-arming the clock in capped hops, so multi-month auctions cost nothing to keep running.
+- Perceived races (a manual close or cancellation landing before the expiry append, an auction already closed, or an unknown id) surface as benign invariant violations and are logged, not retried. The worker is at-most-once: if the close cannot converge after exhausting the configured retries, the error is logged and the auction is left open for the next reconciliation.
 
 ---
 

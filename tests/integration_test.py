@@ -56,19 +56,11 @@ def main() -> int:
             expect(page.get_by_role("heading", name="Auctions")).to_be_visible()
 
             # --- 2. Create an auction --------------------------
-            # The closing time is only editable at whole-minute precision, so
-            # aim at the next minute boundary and start filling the form ~20s
-            # before it. The create/bid steps take a few seconds, so the bid
-            # lands ~15s before the close and the auto-close wait stays short.
-            now_local = datetime.now()
-            closes_at = (now_local + timedelta(minutes=1)).replace(
-                second=0, microsecond=0
-            )
-            start_fill = closes_at - timedelta(seconds=20)
-            if start_fill <= now_local:
-                closes_at += timedelta(minutes=1)
-                start_fill = closes_at - timedelta(seconds=20)
-            time.sleep(max((start_fill - datetime.now()).total_seconds(), 0))
+            # The closing time is editable at second precision (the form's
+            # auction-end input has step="1"), so set a near-term deadline
+            # that gives the create and bid steps a few seconds of headroom
+            # while keeping the auto-close wait short.
+            closes_at = datetime.now() + timedelta(seconds=20)
             closes_at_utc = closes_at.astimezone(timezone.utc)
 
             page.goto(BASE + "/manage-auctions/new", wait_until="domcontentloaded")
@@ -78,7 +70,7 @@ def main() -> int:
             )
             page.locator('input[name="min-price"]').fill("5")
             page.locator('input[name="auction-end"]').fill(
-                closes_at.strftime("%Y-%m-%dT%H:%M")
+                closes_at.strftime("%Y-%m-%dT%H:%M:%S")
             )
             page.locator('input[name="published"]').check()
             page.get_by_role("button", name="Create Auction").click()

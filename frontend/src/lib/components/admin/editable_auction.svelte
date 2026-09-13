@@ -43,6 +43,7 @@
 		<span class="label-text">Auction end (local time)</span>
 		<input
 			type="datetime-local"
+			step="1"
 			class="input"
 			name="auction-end"
 			min={new Date(min_closure ?? Date.now()).toISOString().slice(0, 16)}

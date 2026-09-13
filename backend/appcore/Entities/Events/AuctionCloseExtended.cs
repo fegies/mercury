@@ -2,9 +2,7 @@ using System;
 
 namespace appcore.Entities.Events;
 
-public class AuctionCloseExtended : StoredEvent
+public class AuctionCloseExtended : AuctionEvent
 {
-    public required Guid AuctionId { get; set; }
-
     public DateTime NewClosureTime { get; set; }
 }

@@ -56,15 +56,19 @@ def main() -> int:
             expect(page.get_by_role("heading", name="Auctions")).to_be_visible()
 
             # --- 2. Create an auction --------------------------
-            # Close in a near-term, whole-minute future so the auto-close
-            # machinery can be exercised without waiting hours. Round up to
-            # the next minute and add one more: the auction stays open for
-            # at least 60s and at most ~120s.
+            # The closing time is only editable at whole-minute precision, so
+            # aim at the next minute boundary and start filling the form ~20s
+            # before it. The create/bid steps take a few seconds, so the bid
+            # lands ~15s before the close and the auto-close wait stays short.
             now_local = datetime.now()
-            next_minute = (now_local + timedelta(minutes=1)).replace(
+            closes_at = (now_local + timedelta(minutes=1)).replace(
                 second=0, microsecond=0
             )
-            closes_at = next_minute + timedelta(minutes=1)
+            start_fill = closes_at - timedelta(seconds=20)
+            if start_fill <= now_local:
+                closes_at += timedelta(minutes=1)
+                start_fill = closes_at - timedelta(seconds=20)
+            time.sleep(max((start_fill - datetime.now()).total_seconds(), 0))
             closes_at_utc = closes_at.astimezone(timezone.utc)
 
             page.goto(BASE + "/manage-auctions/new", wait_until="domcontentloaded")
@@ -88,10 +92,6 @@ def main() -> int:
                 raise AssertionError(msg)
             auction_id = match.group(1)
 
-            # The new auction card appears on the public list.
-            page.goto(BASE + "/auctions", wait_until="domcontentloaded")
-            expect(page.get_by_text("Test Auction")).to_be_visible(timeout=30000)
-
             # --- 3. Place a bid --------------------------------
             page.goto(BASE + f"/auctions/{auction_id}", wait_until="domcontentloaded")
             page.locator('input[name="maximum_amount"]').fill("42")
@@ -101,7 +101,7 @@ def main() -> int:
             expect(page.get_by_text("Bid placed.")).to_be_visible(timeout=30000)
             expect(page.get_by_text("You are the highest bidder")).to_be_visible()
             expect(page.get_by_text("€42.00")).to_be_visible()
-            # The auction is still open (the close is at least ~55s away).
+            # The auction is still open; the close is only ~15s away.
             expect(page.get_by_role("heading", name="Place a bid")).to_be_visible()
 
             # --- 4. Auto-close on expiry -----------------------
@@ -111,7 +111,7 @@ def main() -> int:
             remaining = (closes_at_utc - datetime.now(timezone.utc)).total_seconds()
             time.sleep(max(remaining, 5) + 5)
 
-            reload_until = time.monotonic() + 60
+            reload_until = time.monotonic() + 25
             closed_seen = False
             while time.monotonic() < reload_until:
                 page.reload(wait_until="domcontentloaded")
@@ -130,6 +130,10 @@ def main() -> int:
             # The public auction page replaced the bid form with the Closed badge.
             expect(page.get_by_text("Closed", exact=True)).to_be_visible()
             expect(page.get_by_role("heading", name="Place a bid")).not_to_be_visible()
+
+            # A closed auction is still listed on the public auctions page.
+            page.goto(BASE + "/auctions", wait_until="domcontentloaded")
+            expect(page.get_by_text("Test Auction")).to_be_visible(timeout=30000)
 
             print(f"SUCCESS auction_id={auction_id}")
             return 0

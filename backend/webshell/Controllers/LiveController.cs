@@ -34,10 +34,13 @@ public class LiveController(LiveEventHub hub) : ControllerBase
 
             var reader = connection.Reader;
             using var keepAlive = new PeriodicTimer(TimeSpan.FromSeconds(25));
+            // One outstanding waiter per source: PeriodicTimer throws if a
+            // second WaitForNextTickAsync is issued while one is still pending,
+            // so both tasks are reused across iterations.
+            var read = reader.WaitToReadAsync(ct).AsTask();
+            var ping = keepAlive.WaitForNextTickAsync(ct).AsTask();
             while (true)
             {
-                var read = reader.WaitToReadAsync(ct).AsTask();
-                var ping = keepAlive.WaitForNextTickAsync(ct).AsTask();
                 var completed = await Task.WhenAny(read, ping);
 
                 if (completed == ping)
@@ -45,6 +48,7 @@ public class LiveController(LiveEventHub hub) : ControllerBase
                     if (!await ping)
                         break;
                     await Response.WriteAsync(": keep-alive\n\n", ct);
+                    ping = keepAlive.WaitForNextTickAsync(ct).AsTask();
                 }
                 else
                 {
@@ -52,6 +56,7 @@ public class LiveController(LiveEventHub hub) : ControllerBase
                         break;
                     while (reader.TryRead(out var live))
                         await Response.WriteAsync($"data: {JsonSerializer.Serialize(live, SerializerOptions)}\n\n", ct);
+                    read = reader.WaitToReadAsync(ct).AsTask();
                 }
             }
         }

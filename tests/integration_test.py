@@ -102,16 +102,19 @@ def main() -> int:
             admin.goto(BASE + f"/auctions/{auction_id}", wait_until="domcontentloaded")
             expect(admin.get_by_text("€5.00")).to_be_visible()
             bidder.goto(BASE + "/auctions", wait_until="domcontentloaded")
-            expect(bidder.get_by_text("€5.00")).to_be_visible()
+            row = bidder.locator(f'a[href="/auctions/{auction_id}"]')
+            expect(row.get_by_text("€5.00")).to_be_visible()
 
             # --- Outbid: bidder2 takes the lead ---------------------------
             bidder2.goto(BASE + f"/auctions/{auction_id}", wait_until="domcontentloaded")
             place_bid(bidder2, "60")
 
             # With second-max + increment pricing the new price is €50.50.
+            # Price assertions are scoped to the row/card so the toast
+            # description (which also names the price) cannot collide.
             expect(bidder.get_by_text("Outbid on Test Auction")).to_be_visible(timeout=10000)
-            expect(bidder.get_by_text("€50.50")).to_be_visible(timeout=10000)
-            expect(bidder.get_by_text("You have been outbid")).to_be_visible()
+            expect(row.get_by_text("€50.50")).to_be_visible(timeout=10000)
+            expect(row.get_by_text("You have been outbid")).to_be_visible()
             expect(admin.get_by_text("€50.50")).to_be_visible(timeout=10000)
 
             # The leader must not receive an outbid toast.
@@ -122,7 +125,7 @@ def main() -> int:
             # timeout covers the remaining wall clock until the deadline plus
             # the expiry worker's latency.
             remaining = (closes_at_utc - datetime.now(timezone.utc)).total_seconds()
-            close_timeout = int(max(remaining, 0) + 20000)
+            close_timeout = int(max(remaining, 0) * 1000 + 20000)
 
             expect(bidder2.get_by_text("You won Test Auction")).to_be_visible(timeout=close_timeout)
             expect(bidder2.get_by_text("Closed", exact=True).first).to_be_visible(timeout=10000)

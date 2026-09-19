@@ -43,6 +43,18 @@ export type ExtendCloseRequest = {
 
 export type IFormFile = Blob | File;
 
+export type LiveEvent = {
+    kind: LiveEventKind;
+    type: LiveEventType;
+    auctionId: string;
+    title: null | string;
+    price: null | number;
+};
+
+export type LiveEventKind = 'Notification' | 'AuctionUpdated';
+
+export type LiveEventType = 'Outbid' | 'Won' | 'Cancelled' | 'BidPlaced' | 'Closed' | 'Extended';
+
 /**
  * An object describing the current user.
  */
@@ -383,6 +395,22 @@ export type GetApiAuctionsByAuctionIdImagesByImageIdResponses = {
      */
     200: unknown;
 };
+
+export type GetApiEventsStreamData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/events/stream';
+};
+
+export type GetApiEventsStreamResponses = {
+    /**
+     * OK
+     */
+    200: LiveEvent;
+};
+
+export type GetApiEventsStreamResponse = GetApiEventsStreamResponses[keyof GetApiEventsStreamResponses];
 
 export type GetApiProfilepicturesByIdData = {
     body?: never;

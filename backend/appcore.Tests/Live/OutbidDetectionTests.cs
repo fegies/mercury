@@ -82,6 +82,25 @@ public class OutbidDetectionTests
 	}
 
 	[Fact]
+	public void IdenticalRebidByTheLeaderMatchesTheLatestBidAndOutbidsNobody()
+	{
+		// The leader re-enters an unchanged maximum, producing two rows with
+		// the same (bidder, amount). Matching the latest row resolves the
+		// prior state to the leader already being in front, so nobody is
+		// notified twice.
+		var bob = Guid.NewGuid();
+		var alice = Guid.NewGuid();
+		var rebid = Bid(alice, 100m);
+		var context = Context(AuctionWith(Bid(bob, 50m), Bid(alice, 100m), rebid));
+
+		var reconstruction = OutbidDetection.Reconstruct(context, rebid);
+
+		Assert.NotNull(reconstruction);
+		Assert.Equal(alice, reconstruction.Current.HighestBidderId);
+		Assert.Null(OutbidDetection.OutbidUser(reconstruction, alice));
+	}
+
+	[Fact]
 	public void EqualMaximumKeepsTheEarlierBidderInFrontAndReportsNobody()
 	{
 		var leaderId = Guid.NewGuid();

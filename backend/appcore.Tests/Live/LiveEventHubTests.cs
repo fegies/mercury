@@ -108,4 +108,29 @@ public class LiveEventHubTests
 		hub.Broadcast(Ping(Guid.NewGuid()));
 		Assert.False(hub.HasConnections);
 	}
+
+	[Fact]
+	public async Task ConcurrentConnectAndDisconnectLeavesTheRegistryConsistent()
+	{
+		var hub = new LiveEventHub();
+		var userId = Guid.NewGuid();
+
+		await Task.WhenAll(Enumerable.Range(0, 8).Select(_ => Task.Run(() =>
+		{
+			for (var i = 0; i < 500; i++)
+				using (hub.Connect(userId))
+				{
+				}
+		})));
+
+		// Every storm connection was disposed, so the open-connection counter
+		// must be back to zero — an orphaned connection (one that raced a
+		// disconnect's empty-entry cleanup) would leak its count here.
+		Assert.False(hub.HasConnections);
+
+		// A fresh connection after the storm must be registered and reachable.
+		using var connection = hub.Connect(userId);
+		hub.PushToUser(userId, Ping(Guid.NewGuid()));
+		Assert.True(connection.Reader.TryRead(out _));
+	}
 }

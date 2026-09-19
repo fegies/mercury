@@ -46,13 +46,13 @@
 </svelte:head>
 
 <div class="flex flex-col gap-10">
-	<h1 class="h1">{data.auction.title}</h1>
-	<Imageset links={data.auction.imageUrls}></Imageset>
+	<h1 class="h1">{auction.title}</h1>
+	<Imageset links={auction.imageUrls}></Imageset>
 	<div>
-		{data.auction.description}
+		{auction.description}
 	</div>
 
-	{#if data.auction.isClosed}
+	{#if auction.isClosed}
 		<span class="preset-filled-error-500 badge w-fit">Closed</span>
 	{:else}
 		<section class="card flex flex-col gap-4 p-6">

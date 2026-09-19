@@ -659,6 +659,26 @@
         }
       }
     },
+    "/api/events/stream": {
+      "get": {
+        "tags": [
+          "Live"
+        ],
+        "summary": "Streams live events to the signed-in user as server-sent events:\ntargeted notifications (outbid, won, cancelled) and broadcast pings\ntelling clients that an auction changed and should be refetched.\nTransient by design — only events committed while the stream is open\nare delivered; clients reconnect automatically.",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "$ref": "#/components/schemas/LiveEvent"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/profilepictures/{id}": {
       "get": {
         "tags": [
@@ -883,6 +903,57 @@
         "type": "string",
         "format": "binary"
       },
+      "LiveEvent": {
+        "required": [
+          "kind",
+          "type",
+          "auctionId",
+          "title",
+          "price"
+        ],
+        "type": "object",
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/LiveEventKind"
+          },
+          "type": {
+            "$ref": "#/components/schemas/LiveEventType"
+          },
+          "auctionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "title": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "price": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          }
+        }
+      },
+      "LiveEventKind": {
+        "enum": [
+          "Notification",
+          "AuctionUpdated"
+        ]
+      },
+      "LiveEventType": {
+        "enum": [
+          "Outbid",
+          "Won",
+          "Cancelled",
+          "BidPlaced",
+          "Closed",
+          "Extended"
+        ]
+      },
       "Me": {
         "required": [
           "userinfo"
@@ -1003,6 +1074,9 @@
   "tags": [
     {
       "name": "Auction"
+    },
+    {
+      "name": "Live"
     },
     {
       "name": "ProfilePicture"

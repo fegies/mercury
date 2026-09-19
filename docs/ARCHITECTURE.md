@@ -55,6 +55,7 @@ Startup sequence:
 | `UserInfoController` | `GET /api/userinfo/me` | User | Returns current user info + admin flag |
 | `ProfilePictureController` | `GET /api/profilepictures/{id}` | User | Serves locally-stored profile pictures (e.g. Entra photos fetched at login) |
 | `AuctionController` | `GET/POST/PATCH /api/auctions...` | User / Admin | Auction CRUD, image upload/serve/removal |
+| `LiveController` | `GET /api/events/stream` | User | Server-sent-events stream: targeted notifications (outbid, won, cancelled) + broadcast auction-change pings |
 
 ### Services
 
@@ -116,6 +117,39 @@ Custom `WebStatusException` hierarchy (extends `Exception`):
 - Events are never deleted
 - Scoped reads and the append consistency check predicate over `event_type` and `payload` JSON properties; expression indexes can be added per hot path
 
+### Live Events (SSE)
+
+Non-persistent, in-process fan-out of committed domain events to connected
+browsers over `GET /api/events/stream`. Built on the in-memory event bus
+(`IAppBus`) that `DbEventStore` already feeds after every commit.
+
+- `LiveEventHub` (`appcore/Infra/Live/`) — registry of per-connection bounded
+  channels (drop-oldest: a stalled client can never block the bus pump);
+  several connections per user (multiple tabs) are supported.
+- `LiveEventBridge` — hosted service subscribed to `BidPlaced`,
+  `AuctionClosed`, `AuctionCancelled`, `AuctionCloseExtended`. Broadcasts an
+  `AuctionUpdated` ping on every event and pushes targeted `Notification`
+  toasts: outbid (to the prior leader), won (to the winner), cancelled (to
+  every distinct bidder of the auction). Skips all reads while no client is
+  connected.
+- `OutbidDetection` — state-free fold over the auction's log that
+  reconstructs the previous leader on demand (no in-memory mirror, no event
+  enrichment). The outbid user is the prior leader only when the incoming
+  bid actually took the lead away from them; first bids, self-raises, and
+  equal-max raises notify nobody.
+- Delivery is transient by design: only events committed while the stream is
+  open are delivered; the browser reconnects automatically. The stream sends
+  keep-alive comments and sets `X-Accel-Buffering: no` so nginx does not
+  buffer it in production deployments.
+- Frontend: `src/lib/live.ts` consumes the generated typed SSE method
+  (`BackendClient.getApiEventsStream`, reconnection with exponential backoff
+  built into the generated client) and routes notifications to Skeleton
+  toasts (mounted in the authorized layout) and pings to per-auction
+  subscribers; the detail and list pages refetch via `build_browser_client()`
+  so prices and highest-bidder badges update live.
+- Single-instance only: the fan-out lives inside one backend process, same
+  as the in-memory event bus.
+
 ## Frontend Architecture
 
 ### Routing
@@ -157,6 +191,9 @@ Auto-generated from OpenAPI spec (`backend/openapi/backend.json`) via `@hey-api/
 - Output: `src/lib/client/`
 - Single `BackendClient` class with typed SDK methods
 - Factory: `build_client(event)` in `src/lib/api.ts` creates SSR-compatible client
+- Factory: `build_browser_client()` in `src/lib/api.ts` creates a
+  browser-side client (native fetch, same-origin cookies) for live refetches
+  and the SSE stream (`getApiEventsStream`)
 
 ### Styling
 

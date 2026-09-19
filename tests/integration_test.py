@@ -30,7 +30,7 @@ def login(browser, who):
     context = browser.new_context()
     page = context.new_page()
     page.goto(BASE + "/auctions", wait_until="domcontentloaded")
-    authorize = page.get_by_role("button", name=f"Authorize as {who}")
+    authorize = page.get_by_role("button", name=f"Authorize as {who}", exact=True)
     try:
         authorize.wait_for(timeout=45000)
     except Exception:

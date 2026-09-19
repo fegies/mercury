@@ -1,18 +1,44 @@
 <script lang="ts">
 	import Imageset from '$lib/components/common/imageset.svelte';
+	import { build_browser_client } from '$lib/api';
+	import { on_auction_update } from '$lib/live';
+	import type { AuctionSummary } from '$lib/types/auction.js';
 	import type { ActionData, PageData } from './$types';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 
+	let live_auction = $state<AuctionSummary | null>(null);
+	let auction = $derived(live_auction ?? data.auction);
+
 	let currentBid = $derived(
-		form?.bid?.currentBid ?? data.auction.currentBid ?? data.auction.minimumPrice
+		live_auction?.currentBid ?? form?.bid?.currentBid ?? auction.currentBid ?? auction.minimumPrice
 	);
-	let myHighest = $derived(form?.bid?.myHighest ?? data.auction.myHighest ?? 0);
-	let i_am_highest_bidder = $derived(form?.bid?.isHighestBidder ?? data.auction.isHighestBidder);
+	let myHighest = $derived(
+		live_auction?.myHighest ?? form?.bid?.myHighest ?? auction.myHighest ?? 0
+	);
+	let i_am_highest_bidder = $derived(
+		live_auction?.isHighestBidder ?? form?.bid?.isHighestBidder ?? auction.isHighestBidder
+	);
 
 	let min_increase = $derived(Math.max(myHighest, currentBid) + 0.5);
 
 	let i_placed_a_bet = $derived(myHighest > 0);
+
+	$effect(() => {
+		const id = data.auction.id;
+		live_auction = null;
+		return on_auction_update(id, () => {
+			void refetch_auction(id);
+		});
+	});
+
+	async function refetch_auction(id: string) {
+		const client = build_browser_client();
+		const { data: summary, error: apiError } = await client.getApiAuctionsById({ path: { id } });
+		if (!apiError && summary) {
+			live_auction = summary;
+		}
+	}
 </script>
 
 <svelte:head>

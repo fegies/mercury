@@ -1,14 +1,35 @@
 <script lang="ts">
 	import AuctionOverview from './AuctionOverview.svelte';
+	import { build_browser_client } from '$lib/api';
+	import { on_any_auction_update } from '$lib/live';
+	import type { AuctionSummary } from '$lib/types/auction.js';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
+
+	let live_auctions = $state<AuctionSummary[] | null>(null);
+	let auctions = $derived(live_auctions ?? data.auctions);
+
+	$effect(() => {
+		live_auctions = null;
+		return on_any_auction_update(() => {
+			void refetch_auctions();
+		});
+	});
+
+	async function refetch_auctions() {
+		const client = build_browser_client();
+		const { data: summaries, error: apiError } = await client.getApiAuctions();
+		if (!apiError && summaries) {
+			live_auctions = summaries;
+		}
+	}
 </script>
 
 <h1 class="h1">Auctions</h1>
 
 <div class="flex flex-col gap-5">
-	{#each data.auctions as auction (auction.id)}
+	{#each auctions as auction (auction.id)}
 		<a href="/auctions/{auction.id}">
 			<div class="card flex gap-10 p-5">
 				<AuctionOverview {auction}></AuctionOverview>

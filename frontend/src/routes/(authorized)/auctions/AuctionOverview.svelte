@@ -10,7 +10,7 @@
 		auction: AuctionSummary;
 	} = $props();
 
-	let current_bid = $state(auction.currentBid ?? auction.minimumPrice);
+	let current_bid = $derived(auction.currentBid ?? auction.minimumPrice);
 </script>
 
 <div class="flex h-64 w-64 justify-center">

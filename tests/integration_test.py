@@ -85,8 +85,9 @@ def main() -> int:
 
             # The closing time is editable at second precision (the form's
             # auction-end input has step="1"). The deadline must outlast the
-            # notification steps below and still arrive within the test.
-            closes_at = datetime.now() + timedelta(seconds=75)
+            # notification steps below (which take a few seconds once the
+            # SSE stream is live) and still arrive quickly within the test.
+            closes_at = datetime.now() + timedelta(seconds=30)
             closes_at_utc = closes_at.astimezone(timezone.utc)
             auction_id = create_auction(admin, "Test Auction", closes_at)
 

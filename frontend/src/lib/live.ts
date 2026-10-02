@@ -1,4 +1,5 @@
 import { browser } from '$app/environment';
+import { getContext, setContext } from 'svelte';
 import { build_browser_client } from '$lib/api';
 import type { LiveEvent } from '$lib/client/types.gen';
 
@@ -8,10 +9,39 @@ export type LiveAuctionUpdate = LiveEvent & { kind: 'AuctionUpdated' };
 export type NotificationListener = (event: LiveNotification) => void;
 export type AuctionUpdateListener = (event: LiveAuctionUpdate) => void;
 
+const live_stream_key = Symbol('mercury.live-stream');
+
 /**
- * Svelte context key under which the authorized layout shares its stream.
+ * What a subpage may do with the shared stream: register listeners. The
+ * lifecycle (start/stop) stays with the component that opened it.
  */
-export const LIVE_STREAM_CONTEXT_KEY = 'live-stream';
+export type LiveStreamListener = Pick<
+	LiveStream,
+	'on_notification' | 'on_any_auction_update' | 'on_auction_update'
+>;
+
+/**
+ * Called by the authorized layout during component initialization to share
+ * its stream with subpages.
+ */
+export function provide_live_stream(stream: LiveStream): void {
+	setContext(live_stream_key, stream);
+}
+
+/**
+ * Called by a subpage during component initialization to register listeners
+ * against the stream the authorized layout provided. Throws when absent, so
+ * a missing provider fails loudly instead of silently doing nothing.
+ */
+export function use_live_stream(): LiveStreamListener {
+	const stream = getContext<LiveStream | null>(live_stream_key);
+	if (!stream) {
+		throw new Error(
+			'use_live_stream() must run under the authorized layout that provides the stream'
+		);
+	}
+	return stream;
+}
 
 /**
  * One live SSE connection with its own event routing. Whoever opens an

@@ -1,16 +1,19 @@
 <script lang="ts">
 	import Imageset from '$lib/components/common/imageset.svelte';
 	import { build_browser_client } from '$lib/api';
-	import { LIVE_STREAM_CONTEXT_KEY, type LiveStream } from '$lib/live';
-	import { getContext } from 'svelte';
+	import { use_live_stream } from '$lib/live';
+	import { onMount } from 'svelte';
 	import type { AuctionSummary } from '$lib/types/auction.js';
 	import type { ActionData, PageData } from './$types';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 
-	const stream = getContext<LiveStream>(LIVE_STREAM_CONTEXT_KEY);
+	const stream = use_live_stream();
 
-	let live_auction = $state<AuctionSummary | null>(null);
+	// Refetched summary keyed by the auction it belongs to, so a client-side
+	// navigation to another auction never shows stale data.
+	let live_summary = $state<{ id: string; summary: AuctionSummary } | null>(null);
+	let live_auction = $derived(live_summary?.id === data.auction.id ? live_summary.summary : null);
 	let auction = $derived(live_auction ?? data.auction);
 
 	let currentBid = $derived(
@@ -27,22 +30,19 @@
 
 	let i_placed_a_bet = $derived(myHighest > 0);
 
-	$effect(() => {
-		const id = data.auction.id;
-		live_auction = null;
-		const off = stream.on_auction_update(id, () => {
-			void refetch_auction(id);
+	onMount(() => {
+		return stream.on_any_auction_update((event) => {
+			if (event.auctionId === data.auction.id) {
+				void refetch_auction(data.auction.id);
+			}
 		});
-		return () => {
-			off();
-		};
 	});
 
 	async function refetch_auction(id: string) {
 		const client = build_browser_client();
 		const { data: summary, error: apiError } = await client.getApiAuctionsById({ path: { id } });
 		if (!apiError && summary) {
-			live_auction = summary;
+			live_summary = { id, summary };
 		}
 	}
 </script>

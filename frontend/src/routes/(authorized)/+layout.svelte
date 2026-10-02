@@ -1,9 +1,9 @@
 <script lang="ts">
 	import UserAvatar from '$lib/components/common/user_avatar.svelte';
-	import { LIVE_STREAM_CONTEXT_KEY, LiveStream } from '$lib/live';
+	import { LiveStream, provide_live_stream } from '$lib/live';
 	import type { LayoutProps } from './$types';
 	import { AppBar, createToaster, Toaster } from '@skeletonlabs/skeleton-svelte';
-	import { onDestroy, setContext } from 'svelte';
+	import { onDestroy } from 'svelte';
 
 	let { children, data }: LayoutProps = $props();
 
@@ -11,7 +11,7 @@
 
 	const stream = new LiveStream();
 	stream.start();
-	setContext(LIVE_STREAM_CONTEXT_KEY, stream);
+	provide_live_stream(stream);
 
 	const off_notification = stream.on_notification((event) => {
 		const title = event.title ?? 'an auction';

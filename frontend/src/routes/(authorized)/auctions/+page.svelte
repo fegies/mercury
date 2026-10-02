@@ -1,26 +1,22 @@
 <script lang="ts">
 	import AuctionOverview from './AuctionOverview.svelte';
 	import { build_browser_client } from '$lib/api';
-	import { LIVE_STREAM_CONTEXT_KEY, type LiveStream } from '$lib/live';
-	import { getContext } from 'svelte';
+	import { use_live_stream } from '$lib/live';
+	import { onMount } from 'svelte';
 	import type { AuctionSummary } from '$lib/types/auction.js';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
 
-	const stream = getContext<LiveStream>(LIVE_STREAM_CONTEXT_KEY);
+	const stream = use_live_stream();
 
 	let live_auctions = $state<AuctionSummary[] | null>(null);
 	let auctions = $derived(live_auctions ?? data.auctions);
 
-	$effect(() => {
-		live_auctions = null;
-		const off = stream.on_any_auction_update(() => {
+	onMount(() => {
+		return stream.on_any_auction_update(() => {
 			void refetch_auctions();
 		});
-		return () => {
-			off();
-		};
 	});
 
 	async function refetch_auctions() {

@@ -112,15 +112,62 @@ describe('live stream', () => {
 		const off = on_any_auction_update((event) => seen.push(event));
 		on_notification((event) => seen.push(event));
 
-		start_live_stream();
+		const stop = start_live_stream();
 		start_live_stream();
 		await drained;
 
 		expect(build_browser_client).toHaveBeenCalledTimes(1);
 		expect(getApiEventsStream).toHaveBeenCalledTimes(1);
-		expect(getApiEventsStream).toHaveBeenCalledWith({ credentials: 'same-origin' });
+		expect(getApiEventsStream).toHaveBeenCalledWith(
+			expect.objectContaining({ credentials: 'same-origin' })
+		);
 		expect(seen.map((event) => event.kind)).toEqual(['AuctionUpdated', 'Notification']);
 
 		off();
+		stop();
+	});
+
+	it('aborts the stream on cleanup and opens a fresh one on restart', async () => {
+		let abort_first: () => void = () => {};
+		const first_drained = new Promise<void>((resolve) => {
+			abort_first = resolve;
+		});
+
+		function hanging_stream(signal: AbortSignal) {
+			return (async function* () {
+				yield ping('BidPlaced');
+				await new Promise<void>((resolve) => {
+					// An already-aborted signal never fires the event (same
+					// semantics the generated SSE client relies on).
+					if (signal.aborted) {
+						resolve();
+						abort_first();
+						return;
+					}
+					signal.addEventListener('abort', () => {
+						resolve();
+						abort_first();
+					});
+				});
+			})();
+		}
+
+		const getApiEventsStream = vi.fn(async (options: { signal: AbortSignal }) => ({
+			stream: hanging_stream(options.signal)
+		}));
+		(build_browser_client as Mock).mockReturnValue({ getApiEventsStream });
+
+		const stop = start_live_stream();
+		expect(getApiEventsStream).toHaveBeenCalledTimes(1);
+
+		stop();
+		await first_drained;
+
+		const stop_again = start_live_stream();
+		expect(getApiEventsStream).toHaveBeenCalledTimes(2);
+		expect(getApiEventsStream).toHaveBeenLastCalledWith(
+			expect.objectContaining({ signal: expect.any(AbortSignal) })
+		);
+		stop_again();
 	});
 });

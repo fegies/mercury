@@ -9,6 +9,7 @@ export type NotificationListener = (event: LiveNotification) => void;
 export type AuctionUpdateListener = (event: LiveAuctionUpdate) => void;
 
 let started = false;
+let stream_abort: AbortController | null = null;
 const notification_listeners = new Set<NotificationListener>();
 const any_auction_listeners = new Set<AuctionUpdateListener>();
 const per_auction_listeners = new Map<string, Set<AuctionUpdateListener>>();
@@ -50,21 +51,33 @@ export function handle_live_event(event: LiveEvent): void {
 	per_auction_listeners.get(event.auctionId)?.forEach((listener) => listener(update));
 }
 
-export function start_live_stream(): void {
+export function start_live_stream(): () => void {
 	if (!browser || started) {
-		return;
+		return stop_live_stream;
 	}
 	started = true;
-	void drain_live_events();
+	stream_abort = new AbortController();
+	void drain_live_events(stream_abort.signal);
+	return stop_live_stream;
 }
 
-async function drain_live_events(): Promise<void> {
+function stop_live_stream(): void {
+	if (!started) {
+		return;
+	}
+	started = false;
+	stream_abort?.abort();
+	stream_abort = null;
+}
+
+async function drain_live_events(signal: AbortSignal): Promise<void> {
 	const client = build_browser_client();
-	const { stream } = await client.getApiEventsStream({ credentials: 'same-origin' });
+	const { stream } = await client.getApiEventsStream({ credentials: 'same-origin', signal });
 	// The generated ServerSentEventsResult maps the stream element type through
 	// `TData[keyof TData]` in this hey-api release, mangling object payloads; the
 	// runtime yields parsed LiveEvent objects, hence the documented cast. The
-	// stream itself reconnects with exponential backoff.
+	// stream itself reconnects with exponential backoff and ends once the
+	// signal above is aborted.
 	for await (const event of stream as AsyncGenerator<LiveEvent, void, unknown>) {
 		handle_live_event(event);
 	}

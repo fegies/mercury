@@ -10,8 +10,8 @@
 	const toaster = createToaster({ placement: 'bottom-end' });
 
 	onMount(() => {
-		start_live_stream();
-		return on_notification((event) => {
+		const stop_stream = start_live_stream();
+		const off_notification = on_notification((event) => {
 			const title = event.title ?? 'an auction';
 			const price = event.price != null ? `€${event.price.toFixed(2)}` : null;
 			switch (event.type) {
@@ -35,6 +35,10 @@
 					break;
 			}
 		});
+		return () => {
+			stop_stream();
+			off_notification();
+		};
 	});
 </script>
 

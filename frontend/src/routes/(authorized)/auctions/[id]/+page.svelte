@@ -1,7 +1,7 @@
 <script lang="ts">
 	import Imageset from '$lib/components/common/imageset.svelte';
 	import { build_browser_client } from '$lib/api';
-	import { on_auction_update } from '$lib/live';
+	import { LiveStream } from '$lib/live';
 	import type { AuctionSummary } from '$lib/types/auction.js';
 	import type { ActionData, PageData } from './$types';
 
@@ -27,9 +27,12 @@
 	$effect(() => {
 		const id = data.auction.id;
 		live_auction = null;
-		return on_auction_update(id, () => {
+		const stream = new LiveStream();
+		stream.start();
+		stream.on_auction_update(id, () => {
 			void refetch_auction(id);
 		});
+		return () => stream.stop();
 	});
 
 	async function refetch_auction(id: string) {

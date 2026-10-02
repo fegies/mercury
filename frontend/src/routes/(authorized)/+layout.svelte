@@ -1,6 +1,6 @@
 <script lang="ts">
 	import UserAvatar from '$lib/components/common/user_avatar.svelte';
-	import { on_notification, start_live_stream } from '$lib/live';
+	import { LiveStream } from '$lib/live';
 	import type { LayoutProps } from './$types';
 	import { AppBar, createToaster, Toaster } from '@skeletonlabs/skeleton-svelte';
 	import { onMount } from 'svelte';
@@ -10,8 +10,9 @@
 	const toaster = createToaster({ placement: 'bottom-end' });
 
 	onMount(() => {
-		const stop_stream = start_live_stream();
-		const off_notification = on_notification((event) => {
+		const stream = new LiveStream();
+		stream.start();
+		const off_notification = stream.on_notification((event) => {
 			const title = event.title ?? 'an auction';
 			const price = event.price != null ? `€${event.price.toFixed(2)}` : null;
 			switch (event.type) {
@@ -36,8 +37,8 @@
 			}
 		});
 		return () => {
-			stop_stream();
 			off_notification();
+			stream.stop();
 		};
 	});
 </script>

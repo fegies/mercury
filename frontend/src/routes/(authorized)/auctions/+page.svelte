@@ -1,7 +1,7 @@
 <script lang="ts">
 	import AuctionOverview from './AuctionOverview.svelte';
 	import { build_browser_client } from '$lib/api';
-	import { on_any_auction_update } from '$lib/live';
+	import { LiveStream } from '$lib/live';
 	import type { AuctionSummary } from '$lib/types/auction.js';
 	import type { PageData } from './$types';
 
@@ -12,9 +12,12 @@
 
 	$effect(() => {
 		live_auctions = null;
-		return on_any_auction_update(() => {
+		const stream = new LiveStream();
+		stream.start();
+		stream.on_any_auction_update(() => {
 			void refetch_auctions();
 		});
+		return () => stream.stop();
 	});
 
 	async function refetch_auctions() {

@@ -8,77 +8,93 @@ export type LiveAuctionUpdate = LiveEvent & { kind: 'AuctionUpdated' };
 export type NotificationListener = (event: LiveNotification) => void;
 export type AuctionUpdateListener = (event: LiveAuctionUpdate) => void;
 
-let started = false;
-let stream_abort: AbortController | null = null;
-const notification_listeners = new Set<NotificationListener>();
-const any_auction_listeners = new Set<AuctionUpdateListener>();
-const per_auction_listeners = new Map<string, Set<AuctionUpdateListener>>();
+/**
+ * One live SSE connection with its own event routing. Components own an
+ * instance in a local variable, start it when mounted, and stop it on
+ * unmount; the stop aborts the connection and ends the client's reconnect
+ * loop. Opening several instances by accident is safe: each owns a separate
+ * connection (the backend supports several per user) and routes events only
+ * to its own listeners, so there is no shared state to collide.
+ */
+export class LiveStream {
+	#abort: AbortController | null = null;
+	#notification_listeners = new Set<NotificationListener>();
+	#any_auction_listeners = new Set<AuctionUpdateListener>();
+	#per_auction_listeners = new Map<string, Set<AuctionUpdateListener>>();
 
-export function on_notification(listener: NotificationListener): () => void {
-	notification_listeners.add(listener);
-	return () => notification_listeners.delete(listener);
-}
-
-export function on_any_auction_update(listener: AuctionUpdateListener): () => void {
-	any_auction_listeners.add(listener);
-	return () => any_auction_listeners.delete(listener);
-}
-
-export function on_auction_update(auctionId: string, listener: AuctionUpdateListener): () => void {
-	let listeners = per_auction_listeners.get(auctionId);
-	if (!listeners) {
-		listeners = new Set();
-		per_auction_listeners.set(auctionId, listeners);
-	}
-	listeners.add(listener);
-	return () => {
-		listeners.delete(listener);
-		if (listeners.size === 0) {
-			per_auction_listeners.delete(auctionId);
+	/// Opens the connection. Idempotent while running; after `stop` it opens
+	/// a fresh connection. No-op outside the browser.
+	start(): void {
+		if (!browser || this.#abort) {
+			return;
 		}
-	};
-}
-
-export function handle_live_event(event: LiveEvent): void {
-	if (event.kind === 'Notification') {
-		const notification = event as LiveNotification;
-		for (const listener of notification_listeners) listener(notification);
-		return;
+		const controller = new AbortController();
+		this.#abort = controller;
+		void this.#drain(controller);
 	}
 
-	const update = event as LiveAuctionUpdate;
-	for (const listener of any_auction_listeners) listener(update);
-	per_auction_listeners.get(event.auctionId)?.forEach((listener) => listener(update));
-}
-
-export function start_live_stream(): () => void {
-	if (!browser || started) {
-		return stop_live_stream;
+	/// Aborts the connection. Idempotent; a stale drain stops routing.
+	stop(): void {
+		this.#abort?.abort();
+		this.#abort = null;
 	}
-	started = true;
-	stream_abort = new AbortController();
-	void drain_live_events(stream_abort.signal);
-	return stop_live_stream;
-}
 
-function stop_live_stream(): void {
-	if (!started) {
-		return;
+	on_notification(listener: NotificationListener): () => void {
+		this.#notification_listeners.add(listener);
+		return () => this.#notification_listeners.delete(listener);
 	}
-	started = false;
-	stream_abort?.abort();
-	stream_abort = null;
-}
 
-async function drain_live_events(signal: AbortSignal): Promise<void> {
-	const client = build_browser_client();
-	const { stream } = await client.getApiEventsStream({ credentials: 'same-origin', signal });
-	// The generated ServerSentEventsResult maps the stream element type through
-	// `TData[keyof TData]` in this hey-api release, mangling object payloads; the
-	// runtime yields parsed LiveEvent objects, hence the documented cast. The
-	// stream itself reconnects with exponential backoff and ends once the
-	// signal above is aborted.
-	for await (const event of stream as AsyncGenerator<LiveEvent, void, unknown>) {
-		handle_live_event(event);
+	on_any_auction_update(listener: AuctionUpdateListener): () => void {
+		this.#any_auction_listeners.add(listener);
+		return () => this.#any_auction_listeners.delete(listener);
+	}
+
+	on_auction_update(auctionId: string, listener: AuctionUpdateListener): () => void {
+		let listeners = this.#per_auction_listeners.get(auctionId);
+		if (!listeners) {
+			listeners = new Set();
+			this.#per_auction_listeners.set(auctionId, listeners);
+		}
+		listeners.add(listener);
+		return () => {
+			listeners.delete(listener);
+			if (listeners.size === 0) {
+				this.#per_auction_listeners.delete(auctionId);
+			}
+		};
+	}
+
+	/// Routes one event to this stream's listeners. The pump calls this for
+	/// every frame; public so tests can drive routing without a connection.
+	handle(event: LiveEvent): void {
+		if (event.kind === 'Notification') {
+			const notification = event as LiveNotification;
+			for (const listener of this.#notification_listeners) listener(notification);
+			return;
+		}
+
+		const update = event as LiveAuctionUpdate;
+		for (const listener of this.#any_auction_listeners) listener(update);
+		this.#per_auction_listeners.get(event.auctionId)?.forEach((listener) => listener(update));
+	}
+
+	async #drain(controller: AbortController): Promise<void> {
+		const client = build_browser_client();
+		const { stream } = await client.getApiEventsStream({
+			credentials: 'same-origin',
+			signal: controller.signal
+		});
+		// The generated ServerSentEventsResult maps the stream element type
+		// through `TData[keyof TData]` in this hey-api release, mangling object
+		// payloads; the runtime yields parsed LiveEvent objects, hence the
+		// documented cast. The stream reconnects with exponential backoff and
+		// ends once the signal is aborted; a drain superseded by stop/restart
+		// stops routing instead of double-delivering.
+		for await (const event of stream as AsyncGenerator<LiveEvent, void, unknown>) {
+			if (this.#abort !== controller) {
+				return;
+			}
+			this.handle(event);
+		}
 	}
 }

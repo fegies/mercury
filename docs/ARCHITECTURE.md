@@ -128,10 +128,12 @@ browsers over `GET /api/events/stream`. Built on the in-memory event bus
   several connections per user (multiple tabs) are supported.
 - `LiveEventBridge` — hosted service subscribed to `BidPlaced`,
   `AuctionClosed`, `AuctionCancelled`, `AuctionCloseExtended`. Broadcasts an
-  `AuctionUpdated` ping on every event and pushes targeted `Notification`
+  `AuctionUpdated` ping on each subscribed event (admin edits and image
+  changes are deliberately not broadcast) and pushes targeted `Notification`
   toasts: outbid (to the prior leader), won (to the winner), cancelled (to
   every distinct bidder of the auction). Skips all reads while no client is
-  connected.
+  connected. Its handlers run inline on the shared bus pump — with clients
+  connected, each bid adds one per-auction read ahead of other handlers.
 - `OutbidDetection` — state-free fold over the auction's log that
   reconstructs the previous leader on demand (no in-memory mirror, no event
   enrichment). The outbid user is the prior leader only when the incoming

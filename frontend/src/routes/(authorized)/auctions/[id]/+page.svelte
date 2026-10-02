@@ -2,6 +2,7 @@
 	import Imageset from '$lib/components/common/imageset.svelte';
 	import { build_browser_client } from '$lib/api';
 	import { use_live_stream } from '$lib/live';
+	import { BidRecency } from '$lib/bid_recency.svelte.js';
 	import { onMount } from 'svelte';
 	import type { AuctionSummary } from '$lib/types/auction.js';
 	import type { ActionData, PageData } from './$types';
@@ -9,6 +10,7 @@
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 
 	const stream = use_live_stream();
+	const recency = new BidRecency();
 
 	// Refetched summary keyed by the auction it belongs to, so a client-side
 	// navigation to another auction never shows stale data.
@@ -16,15 +18,28 @@
 	let live_auction = $derived(live_summary?.id === data.auction.id ? live_summary.summary : null);
 	let auction = $derived(live_auction ?? data.auction);
 
-	let currentBid = $derived(
-		live_auction?.currentBid ?? form?.bid?.currentBid ?? auction.currentBid ?? auction.minimumPrice
+	// The fresher of the two snapshots feeds the price and badge display: the
+	// user's own bid response until a refetch completes after it (and forever
+	// when the stream is down), the refetched summary otherwise.
+	$effect(() => {
+		if (form?.bid) {
+			recency.mark_bid();
+		}
+	});
+	let live_is_fresher = $derived(recency.live_is_fresher);
+	let bids = $derived(
+		live_is_fresher && live_auction
+			? {
+					currentBid: live_auction.currentBid,
+					myHighest: live_auction.myHighest,
+					isHighestBidder: live_auction.isHighestBidder
+				}
+			: (form?.bid ?? null)
 	);
-	let myHighest = $derived(
-		live_auction?.myHighest ?? form?.bid?.myHighest ?? auction.myHighest ?? 0
-	);
-	let i_am_highest_bidder = $derived(
-		live_auction?.isHighestBidder ?? form?.bid?.isHighestBidder ?? auction.isHighestBidder
-	);
+
+	let currentBid = $derived(bids?.currentBid ?? auction.currentBid ?? auction.minimumPrice);
+	let myHighest = $derived(bids?.myHighest ?? auction.myHighest ?? 0);
+	let i_am_highest_bidder = $derived(bids?.isHighestBidder ?? auction.isHighestBidder);
 
 	let min_increase = $derived(Math.max(myHighest, currentBid) + 0.5);
 
@@ -42,6 +57,7 @@
 		const client = build_browser_client();
 		const { data: summary, error: apiError } = await client.getApiAuctionsById({ path: { id } });
 		if (!apiError && summary) {
+			recency.mark_live();
 			live_summary = { id, summary };
 		}
 	}

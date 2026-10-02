@@ -1,45 +1,46 @@
 <script lang="ts">
 	import UserAvatar from '$lib/components/common/user_avatar.svelte';
-	import { LiveStream } from '$lib/live';
+	import { LIVE_STREAM_CONTEXT_KEY, LiveStream } from '$lib/live';
 	import type { LayoutProps } from './$types';
 	import { AppBar, createToaster, Toaster } from '@skeletonlabs/skeleton-svelte';
-	import { onMount } from 'svelte';
+	import { onDestroy, setContext } from 'svelte';
 
 	let { children, data }: LayoutProps = $props();
 
 	const toaster = createToaster({ placement: 'bottom-end' });
 
-	onMount(() => {
-		const stream = new LiveStream();
-		stream.start();
-		const off_notification = stream.on_notification((event) => {
-			const title = event.title ?? 'an auction';
-			const price = event.price != null ? `€${event.price.toFixed(2)}` : null;
-			switch (event.type) {
-				case 'Outbid':
-					toaster.warning({
-						title: `Outbid on ${title}`,
-						description: price ? `The current price is now ${price}` : undefined
-					});
-					break;
-				case 'Won':
-					toaster.success({
-						title: `You won ${title}`,
-						description: price ? `Winning price: ${price}` : undefined
-					});
-					break;
-				case 'Cancelled':
-					toaster.error({
-						title: `${title} was cancelled`,
-						description: 'The auction was cancelled by an admin.'
-					});
-					break;
-			}
-		});
-		return () => {
-			off_notification();
-			stream.stop();
-		};
+	const stream = new LiveStream();
+	stream.start();
+	setContext(LIVE_STREAM_CONTEXT_KEY, stream);
+
+	const off_notification = stream.on_notification((event) => {
+		const title = event.title ?? 'an auction';
+		const price = event.price != null ? `€${event.price.toFixed(2)}` : null;
+		switch (event.type) {
+			case 'Outbid':
+				toaster.warning({
+					title: `Outbid on ${title}`,
+					description: price ? `The current price is now ${price}` : undefined
+				});
+				break;
+			case 'Won':
+				toaster.success({
+					title: `You won ${title}`,
+					description: price ? `Winning price: ${price}` : undefined
+				});
+				break;
+			case 'Cancelled':
+				toaster.error({
+					title: `${title} was cancelled`,
+					description: 'The auction was cancelled by an admin.'
+				});
+				break;
+		}
+	});
+
+	onDestroy(() => {
+		off_notification();
+		stream.stop();
 	});
 </script>
 

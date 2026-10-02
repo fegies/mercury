@@ -1,11 +1,14 @@
 <script lang="ts">
 	import Imageset from '$lib/components/common/imageset.svelte';
 	import { build_browser_client } from '$lib/api';
-	import { LiveStream } from '$lib/live';
+	import { LIVE_STREAM_CONTEXT_KEY, type LiveStream } from '$lib/live';
+	import { getContext } from 'svelte';
 	import type { AuctionSummary } from '$lib/types/auction.js';
 	import type { ActionData, PageData } from './$types';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
+
+	const stream = getContext<LiveStream>(LIVE_STREAM_CONTEXT_KEY);
 
 	let live_auction = $state<AuctionSummary | null>(null);
 	let auction = $derived(live_auction ?? data.auction);
@@ -27,12 +30,12 @@
 	$effect(() => {
 		const id = data.auction.id;
 		live_auction = null;
-		const stream = new LiveStream();
-		stream.start();
-		stream.on_auction_update(id, () => {
+		const off = stream.on_auction_update(id, () => {
 			void refetch_auction(id);
 		});
-		return () => stream.stop();
+		return () => {
+			off();
+		};
 	});
 
 	async function refetch_auction(id: string) {

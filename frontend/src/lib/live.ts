@@ -9,12 +9,19 @@ export type NotificationListener = (event: LiveNotification) => void;
 export type AuctionUpdateListener = (event: LiveAuctionUpdate) => void;
 
 /**
- * One live SSE connection with its own event routing. Components own an
- * instance in a local variable, start it when mounted, and stop it on
- * unmount; the stop aborts the connection and ends the client's reconnect
- * loop. Opening several instances by accident is safe: each owns a separate
- * connection (the backend supports several per user) and routes events only
- * to its own listeners, so there is no shared state to collide.
+ * Svelte context key under which the authorized layout shares its stream.
+ */
+export const LIVE_STREAM_CONTEXT_KEY = 'live-stream';
+
+/**
+ * One live SSE connection with its own event routing. Whoever opens an
+ * instance keeps it in a local variable, starts it when mounted, and stops
+ * it on unmount; the stop aborts the connection and ends the client's
+ * reconnect loop. Opening several instances by accident is safe: each owns
+ * a separate connection (the backend supports several per user) and routes
+ * events only to its own listeners, so there is no shared state to collide.
+ * The authorized layout opens the one connection per page load and shares
+ * it with subpages through context; subpages only register listeners.
  */
 export class LiveStream {
 	#abort: AbortController | null = null;

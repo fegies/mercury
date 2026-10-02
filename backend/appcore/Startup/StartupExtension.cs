@@ -4,6 +4,7 @@ using appcore.Infra;
 using appcore.Infra.Events;
 using appcore.Infra.Evaluators;
 using appcore.Infra.Expiry;
+using appcore.Infra.Live;
 using appcore.Services;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -31,6 +32,10 @@ public static class StartupExtension
 
         // Auto-closes auctions once their closure time passes.
         builder.Services.AddHostedService<AuctionExpiryWorker>();
+
+        // Live notification fan-out over the SSE stream (/api/events/stream).
+        builder.Services.AddSingleton<LiveEventHub>();
+        builder.Services.AddHostedService<LiveEventBridge>();
 
         builder.Services.AddScoped<IDecisionFunction<AuctionCreated, Guid>, CreateAuctionEvaluator>();
         builder.Services.AddScoped<IDecisionFunction<AuctionUpdated, bool>, UpdateAuctionEvaluator>();

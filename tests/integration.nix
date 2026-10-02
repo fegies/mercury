@@ -15,9 +15,11 @@
 #   1. everything started correctly
 #   2. the OIDC login flow completes (a real browser follows every redirect)
 #   3. an admin creates an auction (with a near-term closing time)
-#   4. a bid is placed
-#   5. the closing time passes and the auction auto-closes (the browser sees
-#      the backend's expired close reflected on the auction page)
+#   4. bids are placed by two bidders
+#   5. live notifications work over the SSE stream through the nginx proxy:
+#      the outbid bidder receives a toast and live price/badge updates, the
+#      leader receives none, the winner receives a won toast when the auction
+#      auto-closes, and bidders are notified when an admin cancels an auction
 #
 # Run with:
 #   nix build .#tests.<system>.integration
@@ -54,6 +56,11 @@ let
       sub = "bidder";
       email = "bidder@example.com";
       name = "Bidder";
+    }
+    {
+      sub = "bidder2";
+      email = "bidder2@example.com";
+      name = "Bidder 2";
     }
   ]);
 in

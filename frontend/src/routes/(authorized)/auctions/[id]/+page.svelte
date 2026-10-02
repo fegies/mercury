@@ -1,18 +1,66 @@
 <script lang="ts">
 	import Imageset from '$lib/components/common/imageset.svelte';
+	import { build_browser_client } from '$lib/api';
+	import { use_live_stream } from '$lib/live';
+	import { BidRecency } from '$lib/bid_recency.svelte.js';
+	import { onMount } from 'svelte';
+	import type { AuctionSummary } from '$lib/types/auction.js';
 	import type { ActionData, PageData } from './$types';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 
-	let currentBid = $derived(
-		form?.bid?.currentBid ?? data.auction.currentBid ?? data.auction.minimumPrice
+	const stream = use_live_stream();
+	const recency = new BidRecency();
+
+	// Refetched summary keyed by the auction it belongs to, so a client-side
+	// navigation to another auction never shows stale data.
+	let live_summary = $state<{ id: string; summary: AuctionSummary } | null>(null);
+	let live_auction = $derived(live_summary?.id === data.auction.id ? live_summary.summary : null);
+	let auction = $derived(live_auction ?? data.auction);
+
+	// The fresher of the two snapshots feeds the price and badge display: the
+	// user's own bid response until a refetch completes after it (and forever
+	// when the stream is down), the refetched summary otherwise.
+	$effect(() => {
+		if (form?.bid) {
+			recency.mark_bid();
+		}
+	});
+	let live_is_fresher = $derived(recency.live_is_fresher);
+	let bids = $derived(
+		live_is_fresher && live_auction
+			? {
+					currentBid: live_auction.currentBid,
+					myHighest: live_auction.myHighest,
+					isHighestBidder: live_auction.isHighestBidder
+				}
+			: (form?.bid ?? null)
 	);
-	let myHighest = $derived(form?.bid?.myHighest ?? data.auction.myHighest ?? 0);
-	let i_am_highest_bidder = $derived(form?.bid?.isHighestBidder ?? data.auction.isHighestBidder);
+
+	let currentBid = $derived(bids?.currentBid ?? auction.currentBid ?? auction.minimumPrice);
+	let myHighest = $derived(bids?.myHighest ?? auction.myHighest ?? 0);
+	let i_am_highest_bidder = $derived(bids?.isHighestBidder ?? auction.isHighestBidder);
 
 	let min_increase = $derived(Math.max(myHighest, currentBid) + 0.5);
 
 	let i_placed_a_bet = $derived(myHighest > 0);
+
+	onMount(() => {
+		return stream.on_any_auction_update((event) => {
+			if (event.auctionId === data.auction.id) {
+				void refetch_auction(data.auction.id);
+			}
+		});
+	});
+
+	async function refetch_auction(id: string) {
+		const client = build_browser_client();
+		const { data: summary, error: apiError } = await client.getApiAuctionsById({ path: { id } });
+		if (!apiError && summary) {
+			recency.mark_live();
+			live_summary = { id, summary };
+		}
+	}
 </script>
 
 <svelte:head>
@@ -20,13 +68,13 @@
 </svelte:head>
 
 <div class="flex flex-col gap-10">
-	<h1 class="h1">{data.auction.title}</h1>
-	<Imageset links={data.auction.imageUrls}></Imageset>
+	<h1 class="h1">{auction.title}</h1>
+	<Imageset links={auction.imageUrls}></Imageset>
 	<div>
-		{data.auction.description}
+		{auction.description}
 	</div>
 
-	{#if data.auction.isClosed}
+	{#if auction.isClosed}
 		<span class="preset-filled-error-500 badge w-fit">Closed</span>
 	{:else}
 		<section class="card flex flex-col gap-4 p-6">

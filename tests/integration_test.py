@@ -1,26 +1,75 @@
 # Playwright end-to-end test for Project Mercury.
 #
 # This script runs INSIDE the NixOS test VM (see integration.nix) via
-# `mercury.succeed("mercury-e2e")`. It drives a real headless Chromium and walks
-# through the complete user journey:
+# `mercury.succeed("mercury-e2e")`. It drives real headless Chromium contexts
+# for an admin and two bidders and walks through the complete user journey:
 #   1. log in through the mock OIDC provider (the browser follows the whole
 #      signin redirect chain on its own)
 #   2. create an auction as the admin, with a near-term closing time
-#   3. place a bid on the freshly created auction
-#   4. let the closing time pass and observe the auction auto-close (the
-#      backend's expiry machinery appends an expired close; the browser then
-#      shows the auction as Closed)
+#   3. place bids and verify the live notification chain over the SSE stream
+#      (through the nginx proxy): the outbid bidder gets a toast plus live
+#      price and badge updates, the new leader gets none, the winner gets a
+#      won toast when the auction auto-closes, and bidders get a toast when
+#      an admin cancels an auction they bid on
+#
+# All waiting is done through Playwright's expectation API (which polls the
+# DOM); the script never sleeps.
 #
 # A non-zero exit code makes the NixOS test fail.
 
 import re
 import sys
-import time
 from datetime import datetime, timedelta, timezone
 
 from playwright.sync_api import sync_playwright, expect
 
 BASE = "http://localhost"
+
+
+def login(browser, who):
+    context = browser.new_context()
+    page = context.new_page()
+    page.goto(BASE + "/auctions", wait_until="domcontentloaded")
+    authorize = page.get_by_role("button", name=f"Authorize as {who}", exact=True)
+    try:
+        authorize.wait_for(timeout=45000)
+    except Exception:
+        print(f"LOGIN-FAILURE({who}) url={page.url!r}")
+        print("LOGIN-FAILURE title=", page.title())
+        print(page.content())
+        raise
+    authorize.click()
+
+    if who == "admin":
+        # The "Manage Auctions" link is only rendered for admins, so its
+        # presence proves both login and the Admin role.
+        page.get_by_role("link", name="Manage Auctions").wait_for(timeout=45000)
+    else:
+        page.get_by_role("heading", name="Auctions").wait_for(timeout=45000)
+    return page
+
+
+def create_auction(admin, title, closes_at):
+    admin.goto(BASE + "/manage-auctions/new", wait_until="domcontentloaded")
+    admin.locator('input[name="name"]').fill(title)
+    admin.locator('textarea[name="description"]').fill("Created by the integration test")
+    admin.locator('input[name="min-price"]').fill("5")
+    admin.locator('input[name="auction-end"]').fill(closes_at.strftime("%Y-%m-%dT%H:%M:%S"))
+    admin.locator('input[name="published"]').check()
+    admin.get_by_role("button", name="Create Auction").click()
+
+    admin.wait_for_load_state("domcontentloaded")
+    match = re.search(r"/manage-auctions/([^/]+)", admin.url)
+    if not match:
+        msg = f"could not find auction id in URL {admin.url!r}"
+        raise AssertionError(msg)
+    return match.group(1)
+
+
+def place_bid(page, amount):
+    page.locator('input[name="maximum_amount"]').fill(amount)
+    page.get_by_role("button", name="Place bid").click()
+    expect(page.get_by_text("Bid placed.")).to_be_visible(timeout=30000)
 
 
 def main() -> int:
@@ -29,105 +78,78 @@ def main() -> int:
             args=["--no-sandbox", "--headless", "--disable-gpu"],
             channel="chromium",
         )
-        page = browser.new_page()
         try:
-            # --- 1. OIDC login --------------------------------
-            # Server-side redirect chain: /auctions -> /api/login
-            # -> IdP authorize form -> /signin-oidc -> back to
-            # /auctions. The real browser follows every hop and
-            # lands on the mock IdP's consent page, where we pick
-            # the admin identity.
-            page.goto(BASE + "/auctions", wait_until="domcontentloaded")
-            admin_btn = page.get_by_role("button", name="Authorize as admin")
-            try:
-                admin_btn.wait_for(timeout=45000)
-            except Exception:
-                print(f"LOGIN-FAILURE url={page.url!r}")
-                print("LOGIN-FAILURE title=", page.title())
-                print(page.content())
-                raise
-            admin_btn.click()
+            admin = login(browser, "admin")
+            bidder = login(browser, "bidder")
+            bidder2 = login(browser, "bidder2")
 
-            # Authenticated: back on the auctions list. The
-            # "Manage Auctions" link is only rendered for admins,
-            # so its presence proves both login and the Admin role.
-            manage_link = page.get_by_role("link", name="Manage Auctions")
-            manage_link.wait_for(timeout=45000)
-            expect(page.get_by_role("heading", name="Auctions")).to_be_visible()
-
-            # --- 2. Create an auction --------------------------
             # The closing time is editable at second precision (the form's
-            # auction-end input has step="1"), so set a near-term deadline
-            # that gives the create and bid steps a few seconds of headroom
-            # while keeping the auto-close wait short.
-            closes_at = datetime.now() + timedelta(seconds=20)
+            # auction-end input has step="1"). The deadline must outlast the
+            # notification steps below (which take a few seconds once the
+            # SSE stream is live) and still arrive quickly within the test.
+            closes_at = datetime.now() + timedelta(seconds=30)
             closes_at_utc = closes_at.astimezone(timezone.utc)
+            auction_id = create_auction(admin, "Test Auction", closes_at)
 
-            page.goto(BASE + "/manage-auctions/new", wait_until="domcontentloaded")
-            page.locator('input[name="name"]').fill("Test Auction")
-            page.locator('textarea[name="description"]').fill(
-                "Created by the integration test"
-            )
-            page.locator('input[name="min-price"]').fill("5")
-            page.locator('input[name="auction-end"]').fill(
-                closes_at.strftime("%Y-%m-%dT%H:%M:%S")
-            )
-            page.locator('input[name="published"]').check()
-            page.get_by_role("button", name="Create Auction").click()
+            # --- Bidder takes the lead ------------------------------------
+            bidder.goto(BASE + f"/auctions/{auction_id}", wait_until="domcontentloaded")
+            place_bid(bidder, "50")
+            expect(bidder.get_by_text("You are the highest bidder")).to_be_visible()
+            expect(bidder.get_by_text("€50.00")).to_be_visible()
 
-            # Submitting redirects (303) to /manage-auctions/{id};
-            # grab the id from the URL.
-            page.wait_for_load_state("domcontentloaded")
-            match = re.search(r"/manage-auctions/([^/]+)", page.url)
-            if not match:
-                msg = f"could not find auction id in URL {page.url!r}"
-                raise AssertionError(msg)
-            auction_id = match.group(1)
+            # --- Observers take their positions ---------------------------
+            # Admin watches the detail page, bidder watches the list; both
+            # must see the upcoming bid live, without reloading.
+            admin.goto(BASE + f"/auctions/{auction_id}", wait_until="domcontentloaded")
+            expect(admin.get_by_text("€5.00")).to_be_visible()
+            bidder.goto(BASE + "/auctions", wait_until="domcontentloaded")
+            row = bidder.locator(f'a[href="/auctions/{auction_id}"]')
+            expect(row.get_by_text("€5.00")).to_be_visible()
 
-            # --- 3. Place a bid --------------------------------
-            page.goto(BASE + f"/auctions/{auction_id}", wait_until="domcontentloaded")
-            page.locator('input[name="maximum_amount"]').fill("42")
-            page.get_by_role("button", name="Place bid").click()
+            # --- Outbid: bidder2 takes the lead ---------------------------
+            bidder2.goto(BASE + f"/auctions/{auction_id}", wait_until="domcontentloaded")
+            place_bid(bidder2, "60")
 
-            # Bid result is rendered after the form action returns.
-            expect(page.get_by_text("Bid placed.")).to_be_visible(timeout=30000)
-            expect(page.get_by_text("You are the highest bidder")).to_be_visible()
-            expect(page.get_by_text("€42.00")).to_be_visible()
-            # The auction is still open; the close is only ~15s away.
-            expect(page.get_by_role("heading", name="Place a bid")).to_be_visible()
+            # With second-max + increment pricing the new price is €50.50.
+            # Price assertions are scoped to the row/card so the toast
+            # description (which also names the price) cannot collide.
+            expect(bidder.get_by_text("Outbid on Test Auction")).to_be_visible(timeout=10000)
+            expect(row.get_by_text("€50.50")).to_be_visible(timeout=10000)
+            expect(row.get_by_text("You have been outbid")).to_be_visible()
+            expect(admin.get_by_text("€50.50")).to_be_visible(timeout=10000)
 
-            # --- 4. Auto-close on expiry -----------------------
-            # Wait until a little past the closing time, then poll for the
-            # Closed state. The backend's expired-close path needs a small
-            # amount of wall-clock time to fire after the deadline passes.
+            # The leader must not receive an outbid toast.
+            expect(bidder2.get_by_text("Outbid on Test Auction")).not_to_be_visible()
+
+            # --- Auto-close: the winner sees it live -----------------------
+            # The toast and the Closed badge arrive over the SSE stream; the
+            # timeout covers the remaining wall clock until the deadline plus
+            # the expiry worker's latency.
             remaining = (closes_at_utc - datetime.now(timezone.utc)).total_seconds()
-            time.sleep(max(remaining, 5) + 5)
+            close_timeout = int(max(remaining, 0) * 1000 + 20000)
 
-            reload_until = time.monotonic() + 25
-            closed_seen = False
-            while time.monotonic() < reload_until:
-                page.reload(wait_until="domcontentloaded")
-                if page.get_by_text("Closed", exact=True).count() > 0:
-                    closed_seen = True
-                    break
-                time.sleep(2)
-
-            if not closed_seen:
-                print("AUTO-CLOSE-FAILURE url=", page.url)
-                print("AUTO-CLOSE-FAILURE title=", page.title())
-                print(page.content())
-                msg = "auction did not auto-close after its closing time"
-                raise AssertionError(msg)
-
-            # The public auction page replaced the bid form with the Closed badge.
-            expect(page.get_by_text("Closed", exact=True)).to_be_visible()
-            expect(page.get_by_role("heading", name="Place a bid")).not_to_be_visible()
+            expect(bidder2.get_by_text("You won Test Auction")).to_be_visible(timeout=close_timeout)
+            expect(bidder2.get_by_text("Closed", exact=True).first).to_be_visible(timeout=10000)
+            expect(admin.get_by_text("Closed", exact=True).first).to_be_visible(timeout=10000)
 
             # A closed auction is still listed on the public auctions page.
-            page.goto(BASE + "/auctions", wait_until="domcontentloaded")
-            expect(page.get_by_text("Test Auction")).to_be_visible(timeout=30000)
+            admin.goto(BASE + "/auctions", wait_until="domcontentloaded")
+            expect(admin.get_by_text("Test Auction")).to_be_visible(timeout=30000)
 
-            print(f"SUCCESS auction_id={auction_id}")
+            # --- Cancellation: bidders are notified ------------------------
+            far_close = datetime.now() + timedelta(hours=1)
+            second_id = create_auction(admin, "Second Auction", far_close)
+
+            bidder.goto(BASE + f"/auctions/{second_id}", wait_until="domcontentloaded")
+            place_bid(bidder, "20")
+
+            admin.goto(BASE + f"/manage-auctions/{second_id}", wait_until="domcontentloaded")
+            admin.get_by_role("button", name="Cancel Auction").click()
+
+            expect(bidder.get_by_text("Second Auction was cancelled")).to_be_visible(timeout=10000)
+            expect(bidder.get_by_text("Closed", exact=True).first).to_be_visible(timeout=10000)
+
+            print(f"SUCCESS auction_id={auction_id} second_id={second_id}")
             return 0
         finally:
             browser.close()

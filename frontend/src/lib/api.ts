@@ -15,3 +15,13 @@ export function build_client(event: RequestEvent): BackendClient {
 		client
 	});
 }
+
+export function build_browser_client(): BackendClient {
+	const client = createClient({
+		fetch: (input, init) => fetch(input, { ...init, credentials: 'same-origin' }),
+		baseUrl: ''
+	});
+	return new BackendClient({
+		client
+	});
+}

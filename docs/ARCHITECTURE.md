@@ -140,7 +140,9 @@ browsers over `GET /api/events/stream`. Built on the in-memory event bus
 - Delivery is transient by design: only events committed while the stream is
   open are delivered; the browser reconnects automatically. The stream sends
   keep-alive comments and sets `X-Accel-Buffering: no` so nginx does not
-  buffer it in production deployments.
+  buffer it in production deployments. An expired session (the stream is
+  rejected with 401) redirects the browser to the login flow; other repeated
+  connection failures end the stream without navigating.
 - Frontend: `src/lib/live.ts` consumes the generated typed SSE method
   (`BackendClient.getApiEventsStream`, reconnection with exponential backoff
   built into the generated client) and routes notifications to Skeleton

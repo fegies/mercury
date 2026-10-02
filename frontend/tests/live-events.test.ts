@@ -95,6 +95,49 @@ describe('live event routing', () => {
 });
 
 describe('live stream lifecycle', () => {
+	type SseOptions = {
+		signal: AbortSignal;
+		onSseError?: (error: unknown) => void;
+		onSseEvent?: () => void;
+	};
+
+	/// Fake generated-client call: captures the options the drain passed and
+	/// yields one frame, then parks until the signal is aborted. The `finally`
+	/// mirrors the generated client's cleanup on abort and early return.
+	function stream_factory(captured: SseOptions[]) {
+		let signal_opened: () => void = () => {};
+		const opened = new Promise<void>((resolve) => {
+			signal_opened = resolve;
+		});
+		let finish_stream: () => void = () => {};
+		const drained = new Promise<void>((resolve) => {
+			finish_stream = resolve;
+		});
+
+		const getApiEventsStream = vi.fn(async (options: SseOptions) => {
+			captured.push(options);
+			signal_opened();
+			return {
+				stream: (async function* () {
+					try {
+						yield ping('BidPlaced');
+						await new Promise<void>((resolve) => {
+							if (options.signal.aborted) {
+								resolve();
+								return;
+							}
+							options.signal.addEventListener('abort', () => resolve());
+						});
+					} finally {
+						finish_stream();
+					}
+				})()
+			};
+		});
+
+		return { getApiEventsStream, opened, drained };
+	}
+
 	it('opens the stream once while running and drains it through the router', async () => {
 		const stream = new LiveStream();
 		const seen: LiveEvent[] = [];
@@ -125,6 +168,73 @@ describe('live stream lifecycle', () => {
 			expect.objectContaining({ credentials: 'same-origin' })
 		);
 		expect(seen.map((event) => event.kind)).toEqual(['AuctionUpdated', 'Notification']);
+	});
+
+	it('navigates to the login flow when the stream is rejected as unauthorized', async () => {
+		const stream = new LiveStream();
+		const captured: SseOptions[] = [];
+		const { getApiEventsStream, opened, drained } = stream_factory(captured);
+		(build_browser_client as Mock).mockReturnValue({ getApiEventsStream });
+
+		const assign = vi.spyOn(window.location, 'assign').mockImplementation(() => {});
+		try {
+			stream.start();
+			await opened;
+
+			expect(captured[0].onSseError).toBeDefined();
+			captured[0].onSseError!(new Error('SSE failed: 401 Unauthorized'));
+
+			await drained;
+			expect(assign).toHaveBeenCalledWith('/api/login');
+		} finally {
+			assign.mockRestore();
+		}
+	});
+
+	it('stops the stream after repeated failures without navigating', async () => {
+		const stream = new LiveStream();
+		const captured: SseOptions[] = [];
+		const { getApiEventsStream, opened, drained } = stream_factory(captured);
+		(build_browser_client as Mock).mockReturnValue({ getApiEventsStream });
+
+		const assign = vi.spyOn(window.location, 'assign').mockImplementation(() => {});
+		try {
+			stream.start();
+			await opened;
+
+			for (let i = 0; i < 5; i++) {
+				captured[0].onSseError!(new Error('SSE failed: 500 Internal Server Error'));
+			}
+
+			await drained;
+			expect(assign).not.toHaveBeenCalled();
+		} finally {
+			assign.mockRestore();
+		}
+	});
+
+	it('keeps the stream alive when frames arrive between failures', async () => {
+		const stream = new LiveStream();
+		const captured: SseOptions[] = [];
+		const { getApiEventsStream, opened, drained } = stream_factory(captured);
+		(build_browser_client as Mock).mockReturnValue({ getApiEventsStream });
+
+		stream.start();
+		await opened;
+
+		const options = captured[0];
+		for (let i = 0; i < 4; i++) {
+			options.onSseError!(new Error('SSE failed: 500 Internal Server Error'));
+		}
+		options.onSseEvent!();
+		for (let i = 0; i < 4; i++) {
+			options.onSseError!(new Error('SSE failed: 500 Internal Server Error'));
+		}
+		expect(options.signal.aborted).toBe(false);
+
+		options.onSseError!(new Error('SSE failed: 500 Internal Server Error'));
+		await drained;
+		expect(options.signal.aborted).toBe(true);
 	});
 
 	it('aborts the stream on stop and opens a fresh one on restart', async () => {

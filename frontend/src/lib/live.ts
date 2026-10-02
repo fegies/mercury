@@ -12,6 +12,16 @@ export type AuctionUpdateListener = (event: LiveAuctionUpdate) => void;
 const live_stream_key = Symbol('mercury.live-stream');
 
 /**
+ * The generated SSE client reports failed connection attempts as
+ * `Error("SSE failed: <status> <statusText>")`; the message is the only
+ * signal it exposes for the status (pinned hey-api 0.99.0, so the format is
+ * visible in the generated diff on regeneration).
+ */
+function is_unauthorized(error: unknown): boolean {
+	return error instanceof Error && /SSE failed: 401\b/.test(error.message);
+}
+
+/**
  * What a subpage may do with the shared stream: register listeners. The
  * lifecycle (start/stop) stays with the component that opened it.
  */
@@ -51,7 +61,10 @@ export function use_live_stream(): LiveStreamListener {
  * a separate connection (the backend supports several per user) and routes
  * events only to its own listeners, so there is no shared state to collide.
  * The authorized layout opens the one connection per page load and shares
- * it with subpages through context; subpages only register listeners.
+ * it with subpages through context; subpages only register listeners. When
+ * the server rejects the connection as unauthorized (expired session), the
+ * stream ends and the browser is sent to the login flow; other repeated
+ * failures end the stream without navigating.
  */
 export class LiveStream {
 	#abort: AbortController | null = null;
@@ -117,9 +130,31 @@ export class LiveStream {
 
 	async #drain(controller: AbortController): Promise<void> {
 		const client = build_browser_client();
+		// Consecutive connection failures with no received frame in between
+		// end the stream: an expired session would otherwise be retried
+		// forever. Every frame — including the server's keep-alive comments —
+		// proves the stream is healthy and resets the budget.
+		let failures = 0;
 		const { stream } = await client.getApiEventsStream({
 			credentials: 'same-origin',
-			signal: controller.signal
+			signal: controller.signal,
+			onSseEvent: () => (failures = 0),
+			onSseError: (error) => {
+				failures += 1;
+				if (is_unauthorized(error)) {
+					// The session is gone: end the stream and send the browser
+					// through the documented login entry point. The navigation
+					// must only ever run in a real browser, never during SSR.
+					this.stop();
+					if (browser) {
+						window.location.assign('/api/login');
+					}
+					return;
+				}
+				if (failures >= 5) {
+					this.stop();
+				}
+			}
 		});
 		// The generated ServerSentEventsResult maps the stream element type
 		// through `TData[keyof TData]` in this hey-api release, mangling object

@@ -2,7 +2,12 @@ namespace backend.Services;
 
 class ImageStorageService : IImageStorage
 {
-    private static readonly string BasePath = Path.GetFullPath("data/images");
+    private readonly string basePath;
+
+    public ImageStorageService(string basePath)
+    {
+        this.basePath = Path.GetFullPath(basePath);
+    }
 
     public async Task<Guid> StoreAsync(string area, Stream source, CancellationToken ct)
     {
@@ -34,6 +39,6 @@ class ImageStorageService : IImageStorage
         return Task.CompletedTask;
     }
 
-    private static string FilePathFor(string area, Guid id)
-        => Path.Combine(BasePath, area, $"{id}.bin");
+    private string FilePathFor(string area, Guid id)
+        => Path.Combine(basePath, area, $"{id}.bin");
 }

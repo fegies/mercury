@@ -20,6 +20,14 @@
 #      the outbid bidder receives a toast and live price/badge updates, the
 #      leader receives none, the winner receives a won toast when the auction
 #      auto-closes, and bidders are notified when an admin cancels an auction
+#   6. a mobile-emulated browser context (Playwright's iPhone 13 device
+#      profile) performs the same login and bidding journey via taps, a
+#      mobile admin creates a third auction via taps and picks a photo for
+#      it through the native camera capture input (capture="environment"
+#      opens the OS photo picker with camera options on phones), and key
+#      pages render at a 360px viewport without horizontal overflow
+#   7. screenshots of every flow (desktop and mobile) are copied from the VM
+#      into the derivation output, landing as result/screenshots/<name>.png
 #
 # Run with:
 #   nix build .#tests.<system>.integration
@@ -61,6 +69,17 @@ let
       sub = "bidder2";
       email = "bidder2@example.com";
       name = "Bidder 2";
+    }
+    {
+      sub = "mobile";
+      email = "mobile@example.com";
+      name = "Mobile Bidder";
+    }
+    {
+      sub = "mobile-admin";
+      email = "mobile-admin@example.com";
+      name = "Mobile Admin";
+      roles = [ "role.admin" ];
     }
   ]);
 in
@@ -130,6 +149,11 @@ in
             ExecStartPre = "${pkgs.postgresql}/bin/pg_isready -h 127.0.0.1 -p 5432";
             Restart = "on-failure";
             DynamicUser = true;
+            # ImageStorageService resolves its image directory relative to the
+            # process working directory ("data/images"); anchor it in the
+            # writable state directory instead of the read-only root.
+            StateDirectory = "mercury";
+            WorkingDirectory = "/var/lib/mercury";
           };
         };
 
@@ -193,6 +217,23 @@ in
       mercury.wait_for_open_port(5023)
 
       with subtest("end-to-end"):
-          mercury.succeed("mercury-e2e")
+          error = None
+          try:
+              output = mercury.succeed("mercury-e2e")
+              # Surface the script's summary (SUCCESS auction_id=...) in the
+              # driver log; command output is otherwise only shown on failure.
+              if output.strip():
+                  print(output.strip())
+          except Exception as e:
+              error = e
+          # Pull the browser screenshots into the derivation output
+          # (result/screenshots/) — also when the journey failed, for
+          # debugging. The directory is absent only if the script never
+          # started (in which case there is nothing to copy).
+          has_shots, _ = mercury.execute("test -d /tmp/screenshots")
+          if has_shots == 0:
+              mercury.copy_from_machine("/tmp/screenshots")
+          if error is not None:
+              raise error
     '';
   }

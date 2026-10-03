@@ -88,7 +88,7 @@ export const actions = {
 		});
 
 		if (apiError) {
-			return fail(400, { errors: [apiError] });
+			return fail(400, { errors: [apiError.detail ?? 'Image upload failed.'] });
 		}
 
 		return { success: true };

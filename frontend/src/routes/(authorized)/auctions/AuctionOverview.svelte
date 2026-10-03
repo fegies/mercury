@@ -13,7 +13,7 @@
 	let current_bid = $derived(auction.currentBid ?? auction.minimumPrice);
 </script>
 
-<div class="flex h-64 w-64 justify-center">
+<div class="flex h-64 w-full justify-center sm:w-64">
 	{#if auction.imageUrls.length > 0}
 		<img
 			src={auction.imageUrls[0]}

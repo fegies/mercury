@@ -47,13 +47,13 @@
 <!-- App Bar -->
 <AppBar>
 	{#snippet lead()}
-		<div class="flex items-center gap-10">
-			<a href="/" class="card p-5">
+		<div class="flex flex-wrap items-center gap-3 sm:gap-10">
+			<a href="/" class="card p-3 sm:p-5">
 				<strong class="text-xl uppercase">{data.branding}</strong>
 			</a>
-			<a href="/auctions" class="card p-5">Auctions</a>
+			<a href="/auctions" class="card p-3 sm:p-5">Auctions</a>
 			{#if data.me}
-				<a href="/manage-auctions" class="card p-5">Manage Auctions</a>
+				<a href="/manage-auctions" class="card p-3 sm:p-5">Manage Auctions</a>
 			{/if}
 		</div>
 	{/snippet}

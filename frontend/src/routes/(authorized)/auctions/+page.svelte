@@ -39,7 +39,7 @@
 <div class="flex flex-col gap-5">
 	{#each auctions as auction (auction.id)}
 		<a href="/auctions/{auction.id}">
-			<div class="card flex gap-10 p-5">
+			<div class="card flex flex-col gap-5 p-5 sm:flex-row sm:gap-10">
 				<AuctionOverview {auction}></AuctionOverview>
 			</div>
 		</a>

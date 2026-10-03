@@ -15,11 +15,11 @@
 #   4. a mobile actor (Playwright's iPhone 13 device profile: phone viewport,
 #      mobile user agent, touch events) performs the same login and bidding
 #      journey on the second auction, driven by taps instead of clicks
-#   5. a mobile admin creates a third auction via taps and photographs it
-#      with Chromium's simulated camera: the fake video device answers
-#      getUserMedia, the frame is captured through the same
-#      getUserMedia -> canvas pipeline an in-app capture feature would use,
-#      and the JPEG flows through the real upload path
+#   5. a mobile admin creates a third auction via taps and picks a photo
+#      for it through the native camera capture input (capture="environment"
+#      opens the OS photo picker with camera options on phones; on desktop
+#      it is a plain image picker), which flows through the real upload
+#      path and renders on the manage and public pages
 #   6. key pages are rendered at a 360px-wide viewport and must not overflow
 #      horizontally, the most common mobile layout defect
 #
@@ -121,40 +121,28 @@ def place_bid_by_touch(page, amount):
     expect(page.get_by_text("Bid placed.")).to_be_visible(timeout=30000)
 
 
-# Captures a photo through the browser's camera pipeline: getUserMedia opens
-# the (Chromium-simulated) camera, a frame is grabbed into a canvas and
-# encoded as JPEG — exactly what an in-app capture feature would do. Returns
-# the JPEG bytes as base64.
-CAMERA_CAPTURE_JS = """async () => {
-    const stream = await navigator.mediaDevices.getUserMedia({video: true});
-    try {
-        const video = document.createElement('video');
-        video.muted = true;
-        video.srcObject = stream;
-        await video.play();
-        await new Promise((resolve) => {
-            if ('requestVideoFrameCallback' in video) {
-                video.requestVideoFrameCallback(() => resolve());
-            } else {
-                video.onloadeddata = () => resolve();
-            }
-        });
-        const canvas = document.createElement('canvas');
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        canvas.getContext('2d').drawImage(video, 0, 0);
-        const blob = await new Promise(
-            (resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.9),
-        );
-        const bytes = new Uint8Array(await blob.arrayBuffer());
-        let binary = '';
-        for (const byte of bytes) {
-            binary += String.fromCharCode(byte);
-        }
-        return btoa(binary);
-    } finally {
-        stream.getTracks().forEach((track) => track.stop());
+# Renders a small JPEG on a canvas and encodes it in the browser, standing
+# in for the file a phone's camera picker would return. Returns the JPEG
+# bytes as base64.
+CAPTURED_PHOTO_JS = """async () => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 64;
+    canvas.height = 64;
+    const context = canvas.getContext('2d');
+    const gradient = context.createLinearGradient(0, 0, 64, 64);
+    gradient.addColorStop(0, '#24425c');
+    gradient.addColorStop(1, '#7bd88f');
+    context.fillStyle = gradient;
+    context.fillRect(0, 0, 64, 64);
+    const blob = await new Promise(
+        (resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.9),
+    );
+    const bytes = new Uint8Array(await blob.arrayBuffer());
+    let binary = '';
+    for (const byte of bytes) {
+        binary += String.fromCharCode(byte);
     }
+    return btoa(binary);
 }"""
 
 
@@ -180,16 +168,7 @@ def main() -> int:
     SCREENSHOTS.mkdir(parents=True, exist_ok=True)
     with sync_playwright() as p:
         browser = p.chromium.launch(
-            args=[
-                "--no-sandbox",
-                "--headless",
-                "--disable-gpu",
-                # Chromium's simulated camera: the fake device answers
-                # getUserMedia with a synthetic video source and the
-                # permission prompt is answered automatically.
-                "--use-fake-device-for-media-stream",
-                "--use-fake-ui-for-media-stream",
-            ],
+            args=["--no-sandbox", "--headless", "--disable-gpu"],
             channel="chromium",
         )
         try:
@@ -295,11 +274,11 @@ def main() -> int:
             expect(mobile.get_by_text("Closed", exact=True).first).to_be_visible(timeout=10000)
             shot(mobile, "mobile-auction-cancelled")
 
-            # --- Mobile admin: auction creation and a camera photo ---------
+            # --- Mobile admin: auction creation and a photo -----------------
             # A second mobile-emulated context with the Admin role creates
             # its own auction entirely through taps on the phone viewport,
-            # then photographs it with the simulated camera and uploads the
-            # capture through the real multipart upload path.
+            # then picks a photo through the native capture input and
+            # uploads it through the real multipart upload path.
             mobile_admin = login(browser, "mobile-admin", context_kwargs=p.devices[MOBILE_DEVICE])
             mobile_admin.goto(BASE + "/manage-auctions", wait_until="domcontentloaded")
             expect(mobile_admin.get_by_role("heading", name="Manage Auctions")).to_be_visible()
@@ -330,12 +309,23 @@ def main() -> int:
                 raise AssertionError(msg)
             mobile_id = match.group(1)
 
-            photo = base64.b64decode(mobile_admin.evaluate(CAMERA_CAPTURE_JS))
+            # The "Take photo" button wraps a native file input with
+            # capture="environment", which opens the OS photo picker with
+            # camera options on phones (ignored on desktop browsers, where
+            # it is a plain image picker). A camera app itself does not
+            # exist in the VM, so the test asserts the attribute and feeds
+            # the input a browser-generated JPEG like a picked photo would
+            # arrive.
+            capture_input = mobile_admin.locator('input[type="file"][capture="environment"]')
+            expect(capture_input).to_have_count(1)
+            photo = base64.b64decode(mobile_admin.evaluate(CAPTURED_PHOTO_JS))
             if len(photo) < 100:
-                raise AssertionError(f"captured frame is suspiciously small: {len(photo)} bytes")
-            mobile_admin.locator('[data-testid="uploader-input"]').set_input_files(
+                raise AssertionError(f"generated photo is suspiciously small: {len(photo)} bytes")
+            capture_input.set_input_files(
                 [{"name": "camera-capture.jpg", "mimeType": "image/jpeg", "buffer": photo}]
             )
+            expect(mobile_admin.get_by_text("camera-capture.jpg")).to_be_visible(timeout=10000)
+            shot(mobile_admin, "mobile-admin-photo-picked")
             mobile_admin.get_by_role("button", name="Add Images").tap()
             try:
                 expect(mobile_admin.get_by_text("Saved.")).to_be_visible(timeout=30000)

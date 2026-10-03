@@ -22,10 +22,10 @@
 #      auto-closes, and bidders are notified when an admin cancels an auction
 #   6. a mobile-emulated browser context (Playwright's iPhone 13 device
 #      profile) performs the same login and bidding journey via taps, a
-#      mobile admin creates a third auction via taps and photographs it
-#      with Chromium's simulated camera (fake video device -> getUserMedia
-#      -> canvas -> JPEG upload), and key pages render at a 360px viewport
-#      without horizontal overflow
+#      mobile admin creates a third auction via taps and picks a photo for
+#      it through the native camera capture input (capture="environment"
+#      opens the OS photo picker with camera options on phones), and key
+#      pages render at a 360px viewport without horizontal overflow
 #   7. screenshots of every flow (desktop and mobile) are copied from the VM
 #      into the derivation output, landing as result/screenshots/<name>.png
 #

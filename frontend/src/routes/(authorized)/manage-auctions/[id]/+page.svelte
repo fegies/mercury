@@ -1,5 +1,6 @@
 <script lang="ts">
 	import EditableAuction from '$lib/components/admin/editable_auction.svelte';
+	import CameraCapture from '$lib/components/admin/camera_capture.svelte';
 	import { FileUpload } from '@skeletonlabs/skeleton-svelte';
 	import type { ActionData, PageData } from './$types';
 
@@ -7,9 +8,16 @@
 	import IconFile from '@lucide/svelte/icons/paperclip';
 	import IconRemove from '@lucide/svelte/icons/circle-x';
 
+	type UploadApi = { acceptedFiles: File[]; setFiles: (files: File[]) => void };
+
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 
 	let auction = $derived(form?.auction ?? data.auction);
+	let upload_api = $state<UploadApi | null>(null);
+
+	function add_capture(file: File) {
+		upload_api?.setFiles([...(upload_api?.acceptedFiles ?? []), file]);
+	}
 </script>
 
 {#if form?.success}
@@ -68,13 +76,22 @@
 	>
 		<label class="label">
 			<span class="label-text">Upload images</span>
-			<FileUpload name="images" accept="image/*" classes="w-full" maxFiles={20}>
+			<FileUpload
+				name="images"
+				accept="image/*"
+				classes="w-full"
+				maxFiles={20}
+				onApiReady={(api) => (upload_api = api)}
+			>
 				{#snippet iconInterface()}<IconDropzone class="size-8" />{/snippet}
 				{#snippet iconFile()}<IconFile class="size-4" />{/snippet}
 				{#snippet iconFileRemove()}<IconRemove class="size-4" />{/snippet}
 			</FileUpload>
 		</label>
-		<input type="submit" class="btn preset-filled-primary-500 w-fit" value="Add Images" />
+		<div class="flex gap-3">
+			<CameraCapture on_capture={add_capture}></CameraCapture>
+			<input type="submit" class="btn preset-filled-primary-500 w-fit" value="Add Images" />
+		</div>
 	</form>
 </section>
 

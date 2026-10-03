@@ -15,7 +15,12 @@
 #   4. a mobile actor (Playwright's iPhone 13 device profile: phone viewport,
 #      mobile user agent, touch events) performs the same login and bidding
 #      journey on the second auction, driven by taps instead of clicks
-#   5. key pages are rendered at a 360px-wide viewport and must not overflow
+#   5. a mobile admin creates a third auction via taps and photographs it
+#      with Chromium's simulated camera: the fake video device answers
+#      getUserMedia, the frame is captured through the same
+#      getUserMedia -> canvas pipeline an in-app capture feature would use,
+#      and the JPEG flows through the real upload path
+#   6. key pages are rendered at a 360px-wide viewport and must not overflow
 #      horizontally, the most common mobile layout defect
 #
 # Screenshots of every flow (desktop and mobile) are written to
@@ -27,6 +32,7 @@
 #
 # A non-zero exit code makes the NixOS test fail.
 
+import base64
 import re
 import sys
 from datetime import datetime, timedelta, timezone
@@ -90,8 +96,11 @@ def create_auction(admin, title, closes_at, screenshot=None):
     if screenshot:
         shot(admin, screenshot)
     admin.get_by_role("button", name="Create Auction").click()
+    # The enhanced form submission is fetch-based: wait for the redirect to
+    # the edit page (whose heading names the auction) before reading the id
+    # out of the URL.
+    expect(admin.get_by_role("heading", name=f"Edit “{title}”")).to_be_visible(timeout=30000)
 
-    admin.wait_for_load_state("domcontentloaded")
     match = re.search(r"/manage-auctions/([^/]+)", admin.url)
     if not match:
         msg = f"could not find auction id in URL {admin.url!r}"
@@ -110,6 +119,43 @@ def place_bid_by_touch(page, amount):
     page.locator('input[name="maximum_amount"]').fill(amount)
     page.get_by_role("button", name="Place bid").tap()
     expect(page.get_by_text("Bid placed.")).to_be_visible(timeout=30000)
+
+
+# Captures a photo through the browser's camera pipeline: getUserMedia opens
+# the (Chromium-simulated) camera, a frame is grabbed into a canvas and
+# encoded as JPEG — exactly what an in-app capture feature would do. Returns
+# the JPEG bytes as base64.
+CAMERA_CAPTURE_JS = """async () => {
+    const stream = await navigator.mediaDevices.getUserMedia({video: true});
+    try {
+        const video = document.createElement('video');
+        video.muted = true;
+        video.srcObject = stream;
+        await video.play();
+        await new Promise((resolve) => {
+            if ('requestVideoFrameCallback' in video) {
+                video.requestVideoFrameCallback(() => resolve());
+            } else {
+                video.onloadeddata = () => resolve();
+            }
+        });
+        const canvas = document.createElement('canvas');
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        canvas.getContext('2d').drawImage(video, 0, 0);
+        const blob = await new Promise(
+            (resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.9),
+        );
+        const bytes = new Uint8Array(await blob.arrayBuffer());
+        let binary = '';
+        for (const byte of bytes) {
+            binary += String.fromCharCode(byte);
+        }
+        return btoa(binary);
+    } finally {
+        stream.getTracks().forEach((track) => track.stop());
+    }
+}"""
 
 
 def assert_no_horizontal_overflow(page, url, wait_for):
@@ -134,7 +180,16 @@ def main() -> int:
     SCREENSHOTS.mkdir(parents=True, exist_ok=True)
     with sync_playwright() as p:
         browser = p.chromium.launch(
-            args=["--no-sandbox", "--headless", "--disable-gpu"],
+            args=[
+                "--no-sandbox",
+                "--headless",
+                "--disable-gpu",
+                # Chromium's simulated camera: the fake device answers
+                # getUserMedia with a synthetic video source and the
+                # permission prompt is answered automatically.
+                "--use-fake-device-for-media-stream",
+                "--use-fake-ui-for-media-stream",
+            ],
             channel="chromium",
         )
         try:
@@ -239,6 +294,74 @@ def main() -> int:
             expect(mobile.get_by_text("Second Auction was cancelled")).to_be_visible(timeout=10000)
             expect(mobile.get_by_text("Closed", exact=True).first).to_be_visible(timeout=10000)
             shot(mobile, "mobile-auction-cancelled")
+
+            # --- Mobile admin: auction creation and a camera photo ---------
+            # A second mobile-emulated context with the Admin role creates
+            # its own auction entirely through taps on the phone viewport,
+            # then photographs it with the simulated camera and uploads the
+            # capture through the real multipart upload path.
+            mobile_admin = login(browser, "mobile-admin", context_kwargs=p.devices[MOBILE_DEVICE])
+            mobile_admin.goto(BASE + "/manage-auctions", wait_until="domcontentloaded")
+            expect(mobile_admin.get_by_role("heading", name="Manage Auctions")).to_be_visible()
+            shot(mobile_admin, "mobile-admin-manage-auctions")
+
+            mobile_admin.get_by_role("link", name="Create Auction").tap()
+            expect(mobile_admin.get_by_role("button", name="Create Auction")).to_be_visible()
+            mobile_admin.locator('input[name="name"]').fill("Mobile Admin Auction")
+            mobile_admin.locator('textarea[name="description"]').fill(
+                "Created and photographed by the mobile admin"
+            )
+            mobile_admin.locator('input[name="min-price"]').fill("5")
+            mobile_admin.locator('input[name="auction-end"]').fill(
+                far_close.strftime("%Y-%m-%dT%H:%M:%S")
+            )
+            mobile_admin.locator('input[name="published"]').tap()
+            if not mobile_admin.locator('input[name="published"]').is_checked():
+                raise AssertionError("published checkbox was not checked by the tap")
+            shot(mobile_admin, "mobile-admin-new-auction-form")
+
+            mobile_admin.get_by_role("button", name="Create Auction").tap()
+            expect(
+                mobile_admin.get_by_role("heading", name="Edit “Mobile Admin Auction”")
+            ).to_be_visible(timeout=30000)
+            match = re.search(r"/manage-auctions/([^/]+)", mobile_admin.url)
+            if not match:
+                msg = f"could not find auction id in URL {mobile_admin.url!r}"
+                raise AssertionError(msg)
+            mobile_id = match.group(1)
+
+            photo = base64.b64decode(mobile_admin.evaluate(CAMERA_CAPTURE_JS))
+            if len(photo) < 100:
+                raise AssertionError(f"captured frame is suspiciously small: {len(photo)} bytes")
+            mobile_admin.locator('[data-testid="uploader-input"]').set_input_files(
+                [{"name": "camera-capture.jpg", "mimeType": "image/jpeg", "buffer": photo}]
+            )
+            mobile_admin.get_by_role("button", name="Add Images").tap()
+            try:
+                expect(mobile_admin.get_by_text("Saved.")).to_be_visible(timeout=30000)
+            except Exception:
+                print("UPLOAD-FAILURE url=", mobile_admin.url)
+                print(
+                    "UPLOAD-FAILURE input-files=",
+                    mobile_admin.evaluate(
+                        "() => { const el = document.querySelector('[data-testid=\"uploader-input\"]');"
+                        " return el ? el.files.length : 'no-input'; }"
+                    ),
+                )
+                print("UPLOAD-FAILURE content=", mobile_admin.content())
+                raise
+            expect(mobile_admin.locator('img[alt=""]').first).to_be_visible()
+
+            # The captured photo is served again on the public detail page.
+            mobile_admin.goto(BASE + f"/auctions/{mobile_id}", wait_until="domcontentloaded")
+            try:
+                expect(mobile_admin.locator('img[alt="item"]').first).to_be_visible(timeout=30000)
+            except Exception:
+                print("PUBLIC-PAGE-FAILURE url=", mobile_admin.url)
+                print("PUBLIC-PAGE-FAILURE title=", mobile_admin.title())
+                print("PUBLIC-PAGE-FAILURE content=", mobile_admin.content())
+                raise
+            shot(mobile_admin, "mobile-admin-auction-with-photo")
 
             # --- Responsive checks -----------------------------------------
             # At a small phone viewport none of the key pages may scroll

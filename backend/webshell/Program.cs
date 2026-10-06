@@ -29,6 +29,13 @@ if (IsRealLaunch)
 {
     config.Validate();
 
+    if (!builder.Environment.IsDevelopment()
+        && config.OidcConfig.AuthorityUrl?.StartsWith("http://") == true)
+        throw new InvalidOperationException(
+            "OidcConfig:AuthorityUrl uses plain HTTP, but the app runs outside Development. "
+            + "Use an HTTPS OIDC authority (plain-HTTP authorities, e.g. the mock IdP, are "
+            + "only supported with ASPNETCORE_ENVIRONMENT=Development).");
+
     if (string.IsNullOrWhiteSpace(builder.Configuration.GetConnectionString("DefaultConnection")))
         throw new InvalidOperationException(
             "No PostgreSQL connection string configured. Set ConnectionStrings__DefaultConnection "
@@ -64,15 +71,22 @@ builder.Services.AddAuthentication(options =>
     options.DefaultScheme = CookieAuthenticationDefaults.AuthenticationScheme;
     options.DefaultChallengeScheme = OpenIdConnectDefaults.AuthenticationScheme;
 })
-.AddCookie()
+.AddCookie(options =>
+{
+    // Explicit policy instead of browser/env defaults: cookies only over
+    // HTTPS (the container contract terminates TLS upstream) and Lax so
+    // cross-site POSTs never carry the session.
+    options.Cookie.HttpOnly = true;
+    options.Cookie.SameSite = SameSiteMode.Lax;
+    options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+})
 .AddOpenIdConnect(options =>
 {
     var oidcConf = config.OidcConfig;
     options.Authority = oidcConf.AuthorityUrl;
-    // Metadata over plain HTTP is only acceptable for non-production
-    // authorities (e.g. a local mock IdP); HTTPS is still enforced for
-    // HTTPS authorities.
-    options.RequireHttpsMetadata = !(oidcConf.AuthorityUrl?.StartsWith("http://") ?? false);
+    // Plain-HTTP authorities (e.g. the local mock IdP) are only supported in
+    // the Development environment; see the fail-fast check below.
+    options.RequireHttpsMetadata = !builder.Environment.IsDevelopment();
     options.ClientId = oidcConf.ClientId;
     options.ClientSecret = oidcConf.ClientSecret;
     options.SignInScheme = CookieAuthenticationDefaults.AuthenticationScheme;
@@ -83,7 +97,10 @@ builder.Services.AddAuthentication(options =>
     options.Scope.Add("profile");
     options.Scope.Add("email");
 
-    options.SaveTokens = true;
+    // OIDC tokens are only consumed by the Entra provisioner (Microsoft Graph
+    // profile photo fetch); avoid persisting them in the auth cookie otherwise.
+    options.SaveTokens =
+        oidcConf.ProviderType == OidcConfigurationValue.ProviderTypeValue.Entra;
     options.GetClaimsFromUserInfoEndpoint = true;
     options.TokenValidationParameters.NameClaimType = JwtRegisteredClaimNames.Name;
     options.TokenValidationParameters.RoleClaimType = "role";

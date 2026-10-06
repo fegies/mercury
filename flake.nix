@@ -60,6 +60,15 @@
                 # backend.exec = "cd backend && export RUST_BACKTRACE=1 && exec cargo watch -x run";
                 frontend.exec = "cd frontend && exec npm run dev";
               };
+
+              # Dev default for the backend's PostgreSQL connection string:
+              # devenv's postgres is socket-only (no TCP) with trust auth for
+              # the current OS user, and appsettings.json intentionally ships
+              # no connection string. Npgsql resolves Host as a Unix-socket
+              # directory; the socket only exists while `devenv up` is running.
+              enterShell = ''
+                export ConnectionStrings__DefaultConnection="Host=''${DEVENV_ROOT:-$PWD}/.devenv/run/postgres;Port=5432;Database=mercury;Username=$(id -un)"
+              '';
             }
           ];
         };

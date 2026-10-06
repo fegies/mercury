@@ -611,7 +611,7 @@
         "tags": [
           "Auction"
         ],
-        "summary": "Serves an auction image by id.",
+        "summary": "Serves an auction image by id. The image must belong to the auction in\nthe URL; images of unpublished auctions are only visible to admins.",
         "parameters": [
           {
             "name": "auctionId",

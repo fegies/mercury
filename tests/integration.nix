@@ -138,6 +138,9 @@ in
           requires = ["postgresql.service"];
           environment = {
             ASPNETCORE_URLS = "http://127.0.0.1:5023";
+            # The backend refuses plain-HTTP OIDC authorities outside the
+            # Development environment; the mock IdP here is http-only.
+            ASPNETCORE_ENVIRONMENT = "Development";
             ConnectionStrings__DefaultConnection = "Host=127.0.0.1;Port=5432;Database=mercury;Username=mercury;Password=mercury";
             OidcConfig__AuthorityUrl = "http://127.0.0.1:9400";
             OidcConfig__ClientId = "mercury";

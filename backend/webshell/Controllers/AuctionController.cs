@@ -266,14 +266,22 @@ public class AuctionController(
     }
 
     /// <summary>
-    /// Serves an auction image by id.
+    /// Serves an auction image by id. The image must belong to the auction in
+    /// the URL; images of unpublished auctions are only visible to admins.
     /// </summary>
     [HttpGet("{auctionId}/images/{imageId}")]
     [Authorize]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public ActionResult ServeImage(Guid auctionId, Guid imageId)
+    public async Task<ActionResult> ServeImage(Guid auctionId, Guid imageId)
     {
+        var state = await auctionService.GetAuctionState(auctionId);
+        if (state.AuctionId == Guid.Empty || (!IsAdmin && !state.IsPublished))
+            return NotFound();
+
+        if (!state.Images.Any(i => i.Id == imageId))
+            return NotFound();
+
         var path = imageStorage.ResolvePath(ImageArea, imageId);
         if (path is null)
             return NotFound();

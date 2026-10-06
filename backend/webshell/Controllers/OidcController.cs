@@ -37,12 +37,16 @@ namespace backend.Controllers
         /// <summary>
         /// Begin the oidc sign-in flow.
         /// </summary>
-        /// <param name="return_to">An optional page to redirect to after signin</param>
+        /// <param name="return_to">An optional local page to redirect to after signin</param>
         [HttpGet("api/login")]
         public ActionResult Login([FromQuery] string? return_to)
         {
             if (return_to != null)
-                return Redirect(return_to);
+            {
+                if (!Url.IsLocalUrl(return_to))
+                    return BadRequest("return_to must be a local URL.");
+                return LocalRedirect(return_to);
+            }
 
             var claims = User.Claims.GroupBy(c => c.Type)
                 .ToDictionary(g => g.Key, g => g.Select(c => c.Value).ToList());

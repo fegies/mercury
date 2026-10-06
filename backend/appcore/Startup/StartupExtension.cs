@@ -17,7 +17,12 @@ public static class StartupExtension
 {
     public static void RegisterAppcoreServices(this IHostApplicationBuilder builder)
     {
-        builder.Services.AddSingleton(new NpgsqlDataSourceBuilder(builder.Configuration.GetConnectionString("DefaultConnection")).Build());
+        // Constructed lazily: hosts that never touch the database (e.g.
+        // build-time OpenAPI generation) may run without a configured
+        // connection string. Real launches enforce the fail-fast contract
+        // in Program.cs and resolve the source for EnsureCreatedAsync.
+        builder.Services.AddSingleton(sp => new NpgsqlDataSourceBuilder(
+            sp.GetRequiredService<IConfiguration>().GetConnectionString("DefaultConnection")).Build());
         builder.Services.AddScoped<IEventReader, DbEventStore>();
         builder.Services.AddScoped<IEventStore, DbEventStore>();
         builder.Services.AddSingleton<EventHandlerOptions>();

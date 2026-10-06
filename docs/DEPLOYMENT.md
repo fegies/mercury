@@ -163,6 +163,11 @@ The redirect URI registered with the provider must be
 `https://<public-host>/signin-oidc`; the post-signout landing page is
 `https://<public-host>/signedout`.
 
+The authority must use **HTTPS**: outside the `Development` environment the
+backend refuses to start with a plain-HTTP `OidcConfig__AuthorityUrl` (this
+is the supported escape hatch for test environments with a local mock IdP),
+and OIDC metadata over TLS is always enforced there.
+
 ### Optional
 
 | Variable                              | Meaning                                              | Default                    |
@@ -233,6 +238,18 @@ proxy). The contract:
 
 Do **not** send `X-Forwarded-*` headers from untrusted clients directly to
 the container port — only the TLS terminator should reach it.
+
+### Security headers
+
+The container's nginx stamps a baseline on every response:
+`X-Content-Type-Options: nosniff`, `Referrer-Policy:
+strict-origin-when-cross-origin`, and `X-Frame-Options: DENY`. What it
+deliberately does **not** set is `Strict-Transport-Security` (HSTS): the
+container speaks plain HTTP, so HSTS is only meaningful over TLS and belongs
+at the terminator. Send e.g. `Strict-Transport-Security:
+max-age=31536000; includeSubDomains` from your ingress, and add a
+`Content-Security-Policy` there if you want one — the container will pass it
+through untouched.
 
 ## Health, logs, shutdown
 

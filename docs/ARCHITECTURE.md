@@ -9,7 +9,7 @@ Self-hosted auction platform for organization-internal auctions. Users browse an
 | Frontend | SvelteKit + Svelte 5 (runes) | 2.16 / 5.0 |
 | UI | Skeleton UI (Rocket theme) + Tailwind CSS 4 | 3.1 / 4.0 |
 | Backend | ASP.NET Core (C#) | 10.0 |
-| Database | PostgreSQL via Entity Framework Core | 10.0 |
+| Database | PostgreSQL via raw Npgsql (single event-sourced `app_events` table) | 10.0 |
 | Auth | OIDC (cookie + OpenIdConnect) | — |
 | API Client | @hey-api/openapi-ts (auto-generated) | 0.99 |
 | Dev Env | Nix flakes + direnv | — |
@@ -19,7 +19,7 @@ Self-hosted auction platform for organization-internal auctions. Users browse an
 | Directory | Purpose |
 |---|---|
 | `backend/webshell/` | ASP.NET host — controllers, auth, services |
-| `backend/appcore/` | Domain — entities, DbContext, migrations, infra |
+| `backend/appcore/` | Domain — entities, events, DCB event-sourcing infra |
 | `frontend/src/lib/` | Shared code — API client, components, types |
 | `frontend/src/routes/` | SvelteKit file-based routing |
 | `nix/` | Nix packaging |
@@ -38,9 +38,9 @@ Self-hosted auction platform for organization-internal auctions. Users browse an
 Startup sequence:
 1. Load and validate `BackendConfig` from appsettings
 2. Register event-sourcing infra (`NpgsqlDataSource`, `DbEventStore`, evaluators, handlers)
-3. Register `UserProvisionService` and provider-specific `IUserProvisioner` (Zitadel or generic)
+3. Register `UserProvisionService` and provider-specific `IUserProvisioner` (Zitadel, Entra or generic)
 4. Configure cookie + OIDC authentication (openid, profile, email scopes)
-5. `OnTicketReceived` triggers `UserProvisionService.ProvisionUser()` to provision users as domain events
+5. `OnTokenValidated` triggers `UserProvisionService.ProvisionUser()` to provision users as domain events
 6. Authorization: `IsAdmin` policy + fallback `RequireAuthenticatedUser`
 7. OpenAPI spec generation (dev mode only)
 8. `WebStatusException` middleware for error handling
@@ -101,7 +101,7 @@ BackendConfig
 ### Authorization
 
 - **Fallback policy:** All endpoints require authentication
-- **`IsAdmin` policy:** Checks `mercury.role == "Admin"` claim (set during Zitadel provisioning)
+- **`IsAdmin` policy:** Checks `mercury.role == "Admin"` claim (stamped by the provider-specific provisioner at login)
 - Admin-only endpoints: `/manage-auctions/*`
 
 ### Error Handling
@@ -212,7 +212,7 @@ User → Protected Route → OIDC Challenge → IdP (Zitadel/Entra/Generic)
                                                     ↓
                                           Auth code → Token exchange
                                                     ↓
-                                          OnTicketReceived fires
+                                          OnTokenValidated fires
                                                      ↓
                                           UserProvisionService.ProvisionUser()
                                           ├── Provider builds ProvisionUserInput from claims

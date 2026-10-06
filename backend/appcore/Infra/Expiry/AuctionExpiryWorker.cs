@@ -14,14 +14,19 @@ namespace appcore.Infra.Expiry;
 /// Keeps the in-process deadline scheduler in sync with the stored auction log and turns due
 /// deadlines into <see cref="AuctionClosed"/> appends with <c>Reason = Expired</c>. Subscribes to
 /// the lifecycle events that change an auction's closure, reconciles open auctions at startup
-/// (so long-running deadlines survive restarts, bounded by the scheduler's 24h cap), and
-/// swallows benign conflicts when a close races a manual close or cancellation.
+/// (so long-running deadlines survive restarts, bounded by the scheduler's 24h cap), swallows
+/// benign conflicts when a close races a manual close or cancellation, and re-arms the deadline
+/// when a close fails to converge (a lost deadline entry would otherwise leave the auction open
+/// until the next restart).
 /// </summary>
 public sealed class AuctionExpiryWorker : BackgroundService
 {
+	private static readonly TimeSpan RetryDelay = TimeSpan.FromSeconds(10);
+
 	private readonly IAppBus _bus;
 	private readonly IServiceScopeFactory _scopeFactory;
 	private readonly AuctionDeadlineScheduler _scheduler;
+	private readonly TimeProvider _timeProvider;
 	private readonly ILogger<AuctionExpiryWorker> _logger;
 	private readonly List<IDisposable> _subscriptions = [];
 
@@ -34,6 +39,7 @@ public sealed class AuctionExpiryWorker : BackgroundService
 		_bus = bus;
 		_scopeFactory = scopeFactory;
 		_scheduler = new AuctionDeadlineScheduler(timeProvider);
+		_timeProvider = timeProvider;
 		_logger = logger;
 	}
 
@@ -109,9 +115,13 @@ public sealed class AuctionExpiryWorker : BackgroundService
 		{
 			_logger.AutoCloseNotApplied(elapsed.AuctionId, ex.Message);
 		}
-		catch (InvalidOperationException ex)
+		catch (ConvergenceException ex)
 		{
+			// The scheduler entry was consumed before the close ran; without a re-arm the
+			// close is lost and the auction stays open (still accepting bids) until a
+			// restart. Retry a bounded distance out instead of hot-looping.
 			_logger.AutoCloseFailed(elapsed.AuctionId, ex);
+			_scheduler.Schedule(elapsed.AuctionId, _timeProvider.GetUtcNow().UtcDateTime + RetryDelay);
 		}
 	}
 

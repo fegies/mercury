@@ -1,4 +1,5 @@
 using appcore.Infra.Live;
+using appcore.Tests.Infrastructure;
 using Xunit;
 
 namespace appcore.Tests.Live;
@@ -11,6 +12,25 @@ public class LiveEventHubTests
 	public void NewHubHasNoConnections()
 	{
 		Assert.False(new LiveEventHub().HasConnections);
+	}
+
+	[Fact]
+	public void ConnectionCapRejectsTheSixthConnectionAndAllowsItAgainAfterDispose()
+	{
+		var hub = new LiveEventHub();
+		var userId = Guid.NewGuid();
+		var connections = Enumerable.Range(0, 5).Select(_ => hub.Connect(userId)).ToList();
+
+		Assert.False(hub.TryConnect(userId, out var rejected));
+		Assert.Null(rejected);
+
+		connections[0].Dispose();
+		Assert.True(hub.TryConnect(userId, out var reconnected));
+		Assert.NotNull(reconnected);
+
+		foreach (var connection in connections.Skip(1))
+			connection.Dispose();
+		reconnected!.Dispose();
 	}
 
 	[Fact]
@@ -118,9 +138,19 @@ public class LiveEventHubTests
 		await Task.WhenAll(Enumerable.Range(0, 8).Select(_ => Task.Run(() =>
 		{
 			for (var i = 0; i < 500; i++)
-				using (hub.Connect(userId))
+			{
+				// Sibling tasks contend for the same user's five slots; a
+				// capped connect just waits for one of them to free up.
+				while (true)
 				{
+					if (hub.TryConnect(userId, out var connection))
+					{
+						connection.Dispose();
+						break;
+					}
+					Thread.Yield();
 				}
+			}
 		})));
 
 		// Every storm connection was disposed, so the open-connection counter

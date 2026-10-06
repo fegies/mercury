@@ -170,13 +170,33 @@ Notes:
 | `EntraConfig__AdminGroupIds` | JSON array of Entra group ids granting admin (Entra only) | `[]` |
 
 The redirect URI registered with the provider must be
-`https://<public-host>/signin-oidc`; the post-signout landing page is
-`https://<public-host>/signedout`.
+`https://<public-host>/signin-oidc`. Register
+`https://<public-host>/signedout` as a **post-logout redirect URI** as
+well: the UI's "sign out of SSO" action performs RP-initiated logout
+against that address (a plain logout only clears the local cookie).
 
 The authority must use **HTTPS**: outside the `Development` environment the
 backend refuses to start with a plain-HTTP `OidcConfig__AuthorityUrl` (this
 is the supported escape hatch for test environments with a local mock IdP),
 and OIDC metadata over TLS is always enforced there.
+
+#### Sessions
+
+Sessions are the backend's encrypted auth cookie with an **absolute 12-hour
+expiry** (no sliding). There is no background token refresh; when the cookie
+expires, the next request simply redirects through the standard OIDC
+sign-in flow. That round-trip is **invisible** while the user still holds
+an SSO session at the identity provider (the default for Zitadel/Entra
+users), so users who are actively working rarely notice it. Consequences:
+
+- A role change at the provider takes effect at the user's next sign-in, at
+  most 12 hours after their last full login.
+- A user who also ended their IdP session must sign in again explicitly —
+  the challenge becomes the regular login prompt.
+- A request that arrives after the cookie expired (e.g. a bid submitted
+  exactly then) fails with 401 instead of being silently refreshed; the
+  live-notification stream recovers on its own by re-running the sign-in
+  flow.
 
 ### Optional
 
@@ -198,6 +218,13 @@ ForwardedConfig__TrustedProxies__1=10.0.0.6
 One IP per indexed variable — a comma-separated single value (e.g.
 `ForwardedConfig__TrustedProxies=10.0.0.5,10.0.0.6`) is not supported and
 would silently bind to an empty list.
+
+**Rate limiting depends on this list.** Authenticated requests are
+throttled per user; the one anonymous entry point (`/api/login`) is
+throttled **per client IP**. Unless the TLS terminator is listed in
+`ForwardedConfig__TrustedProxies__N`, the backend sees the terminator's IP
+as the client address and all anonymous users share a single throttle
+bucket — add your terminator's IP(s) so per-client limiting works.
 
 ## Data volume
 
@@ -249,6 +276,14 @@ proxy). The contract:
 Do **not** send `X-Forwarded-*` headers from untrusted clients directly to
 the container port — only the TLS terminator should reach it.
 
+**Publish only on the standard port 443.** The SvelteKit frontend checks
+form-POST origins against the request origin it derives from the forwarded
+headers (without a port); a browser always includes non-default ports in
+its `Origin` header, so a deployment on e.g. `:8443` would have every form
+POST rejected. If a non-443 port is unavoidable, set
+`ORIGIN=https://<host>:<port>` in the container environment so the
+frontend compares against the full public origin instead.
+
 ### Security headers
 
 The container's nginx stamps a baseline on every response:
@@ -260,6 +295,25 @@ at the terminator. Send e.g. `Strict-Transport-Security:
 max-age=31536000; includeSubDomains` from your ingress, and add a
 `Content-Security-Policy` there if you want one — the container will pass it
 through untouched.
+
+### Read-only root filesystem
+
+The image is prepared to run with a read-only root filesystem — the
+recommended hardening:
+
+```bash
+podman run -d --restart=on-failure --name mercury \
+  --read-only --tmpfs /tmp \
+  -p 8080:8080 \
+  -v mercury-images:/var/lib/mercury \
+  ...
+```
+
+Everything stateful already lives outside the root filesystem: nginx keeps
+its temp files under `/tmp` (the `--tmpfs /tmp` mount), ASP.NET's scratch
+space and DataProtection keys live in the `/var/lib/mercury` volume, and so
+do the uploaded images. The smoke test
+(`nix build .#tests.<system>.container`) runs this exact configuration.
 
 ## Health, logs, shutdown
 

@@ -61,7 +61,16 @@
 	{#snippet trail()}
 		<UserAvatar user={data?.me?.userinfo}>
 			{#snippet menu()}
-				<a href="/api/logout">Logout</a>
+				<form method="post" action="/api/logout">
+					<button type="submit" class="block w-full cursor-pointer text-left hover:underline">
+						Logout
+					</button>
+				</form>
+				<form method="post" action="/api/logout?idp=1">
+					<button type="submit" class="block w-full cursor-pointer text-left hover:underline">
+						Sign out of SSO
+					</button>
+				</form>
 			{/snippet}
 		</UserAvatar>
 	{/snippet}

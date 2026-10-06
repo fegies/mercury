@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Threading.Channels;
 
 namespace appcore.Infra.Live;
@@ -6,7 +7,8 @@ namespace appcore.Infra.Live;
 /// Registry of open live-stream connections. Pure fan-out primitive with no
 /// bus or domain knowledge: the bridge resolves domain events into messages
 /// and pushes them here; the SSE controller registers/unregisters connections.
-/// Supports several concurrent connections per user (multiple tabs).
+/// Supports several concurrent connections per user (multiple tabs), bounded
+/// by <see cref="MaxConnectionsPerUser"/>.
 /// </summary>
 /// <remarks>
 /// The registry is guarded by a single lock (same pattern as the app bus's
@@ -18,6 +20,13 @@ namespace appcore.Infra.Live;
 /// </remarks>
 public sealed class LiveEventHub
 {
+	/// <summary>
+	/// Ceiling on simultaneous connections per user. Tabs are legitimate;
+	/// thousands of open streams per identity are not — the SSE endpoint
+	/// surfaces the refusal as HTTP 429.
+	/// </summary>
+	private const int MaxConnectionsPerUser = 5;
+
 	private readonly Lock _registryLock = new();
 	private readonly Dictionary<Guid, Dictionary<long, Channel<LiveEvent>>> _byUser = [];
 	private long _nextConnectionId;
@@ -27,30 +36,33 @@ public sealed class LiveEventHub
 	public bool HasConnections => Volatile.Read(ref _openConnections) > 0;
 
 	/// <summary>
-	/// Opens a connection for the user. Dispose the returned connection when
-	/// its request ends; disposal is idempotent.
+	/// Opens a connection for the user unless they already hold
+	/// <see cref="MaxConnectionsPerUser"/> open connections. Dispose the
+	/// returned connection when its request ends; disposal is idempotent.
 	/// </summary>
-	public LiveConnection Connect(Guid userId)
+	public bool TryConnect(Guid userId, [NotNullWhen(true)] out LiveConnection? connection)
 	{
-		var channel = Channel.CreateBounded<LiveEvent>(new BoundedChannelOptions(capacity: 64)
-		{
-			FullMode = BoundedChannelFullMode.DropOldest,
-			SingleReader = true,
-			SingleWriter = false,
-		});
-
+		connection = null;
 		lock (_registryLock)
 		{
-			var id = _nextConnectionId++;
 			if (!_byUser.TryGetValue(userId, out var connections))
+				connections = _byUser[userId] = [];
+
+			if (connections.Count >= MaxConnectionsPerUser)
+				return false;
+
+			var id = _nextConnectionId++;
+			var channel = Channel.CreateBounded<LiveEvent>(new BoundedChannelOptions(capacity: 64)
 			{
-				connections = [];
-				_byUser[userId] = connections;
-			}
+				FullMode = BoundedChannelFullMode.DropOldest,
+				SingleReader = true,
+				SingleWriter = false,
+			});
 			connections[id] = channel;
 			Interlocked.Increment(ref _openConnections);
 
-			return new LiveConnection(channel.Reader, () => Disconnect(userId, id, channel));
+			connection = new LiveConnection(channel.Reader, () => Disconnect(userId, id, channel));
+			return true;
 		}
 	}
 

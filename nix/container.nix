@@ -64,6 +64,7 @@ let
       access_log /dev/stdout;
       sendfile on;
       keepalive_timeout 65;
+      server_tokens off;
       # Photo uploads are POSTed as multipart bodies and re-sent to the
       # backend by the SvelteKit server, so they traverse this proxy twice.
       # Aligned with ASP.NET's 30 MB default request size limit and the
@@ -156,9 +157,10 @@ let
     nobody:x:65534:
     EOF
 
-    cat > $out/etc/resolv.conf <<'EOF'
-    nameserver 127.0.0.11
-    EOF
+    # /etc/resolv.conf is deliberately NOT baked in: 127.0.0.11 is the
+    # docker/podman embedded DNS stub and would break resolution on runtimes
+    # that mount their own resolv.conf (k8s CNI, plain runc). The container
+    # runtime supplies a working one for every supported setup.
   '';
 
   # Entrypoint: starts the three services; exits (killing the rest) when any

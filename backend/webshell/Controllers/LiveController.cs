@@ -1,6 +1,7 @@
 using System.Text.Json;
 using appcore.Infra.Live;
 using backend.Auth;
+using backend.Errors;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -22,9 +23,12 @@ public class LiveController(LiveEventHub hub) : ControllerBase
     [HttpGet("stream")]
     [Authorize]
     [ProducesResponseType(typeof(LiveEvent), StatusCodes.Status200OK, "text/event-stream")]
+    [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
     public async Task GetStream([FromCurrentUser] Guid currentUserId, CancellationToken ct)
     {
-        var connection = hub.Connect(currentUserId);
+        if (!hub.TryConnect(currentUserId, out var connection))
+            throw new TooManyRequestsException(
+                "Too many live connections for this user; close unused tabs and reconnect.");
         try
         {
             Response.ContentType = "text/event-stream";

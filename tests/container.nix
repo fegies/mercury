@@ -14,7 +14,9 @@
 #   5. uploaded images are stored inside the /var/lib/mercury volume and the
 #      directory is owned by the service user (mercury)
 #   6. the image's HEALTHCHECK passes (run on demand)
-#   7. the container stops cleanly on SIGTERM (tini -> entrypoint)
+#   7. the container runs with a read-only root filesystem (plus tmpfs /tmp),
+#      the recommended production hardening
+#   8. the container stops cleanly on SIGTERM (tini -> entrypoint)
 #
 # Run with:
 #   nix build .#tests.<system>.container
@@ -135,20 +137,25 @@ in
 
       mercury.succeed(f"{pod} load -i ${image}/share/mercury/image.tar.gz")
 
-      # Plain run: the image is fully rootless (User=1000) — no extra
-      # capabilities, no cgroup configuration, no tty needed; the entrypoint's
-      # stdout/stderr IS the container log.
-      mercury.succeed(
-        f"{pod} run -d --name mercury --network=host "
+      # Environment shared by both runs below (plain + read-only rootfs).
+      env = (
         # The mock IdP is http-only; the backend refuses plain-HTTP OIDC
         # authorities outside the Development environment (the production
         # posture this image otherwise enforces).
-        + "-e 'ASPNETCORE_ENVIRONMENT=Development' "
+        "-e 'ASPNETCORE_ENVIRONMENT=Development' "
         + "-e 'ConnectionStrings__DefaultConnection=Host=127.0.0.1;Port=5432;Database=mercury;Username=mercury;Password=mercury' "
         + "-e 'OidcConfig__AuthorityUrl=http://127.0.0.1:9400' "
         + "-e 'OidcConfig__ClientId=mercury' "
         + "-e 'OidcConfig__ClientSecret=mercury' "
         + "-e 'OidcConfig__ProviderType=Generic' "
+      )
+
+      # Plain run: the image is fully rootless (User=1000) — no extra
+      # capabilities, no cgroup configuration, no tty needed; the entrypoint's
+      # stdout/stderr IS the container log.
+      mercury.succeed(
+        f"{pod} run -d --name mercury --network=host "
+        + env
         + "${imageRef}"
       )
 
@@ -250,9 +257,33 @@ in
       with subtest("healthcheck passes"):
           mercury.succeed(f"{pod} healthcheck run mercury")
 
+      # The recommended production posture: read-only root filesystem. The
+      # image is prepared for it — nginx temp paths live under /tmp and
+      # everything stateful (uploaded images, ASP.NET scratch and
+      # DataProtection keys) lives in the /var/lib/mercury volume.
+      mercury.succeed(f"{pod} stop -t 40 mercury")
+      mercury.wait_for_closed_port(8080)
+
+      with subtest("runs with a read-only root filesystem"):
+          mercury.succeed(
+            f"{pod} run -d --name mercury-ro --read-only --tmpfs /tmp --network=host "
+            + env
+            + "${imageRef}"
+          )
+          try:
+              mercury.wait_until_succeeds(
+                  "curl -fsS http://localhost:8080/api/healthz", timeout=90
+              )
+          except Exception:
+              _, logs = mercury.execute(f"{pod} logs mercury-ro")
+              print("=== read-only container logs (health probe failed) ===")
+              print(logs)
+              raise
+          mercury.succeed("curl -fsS http://localhost:8080/ -o /dev/null")
+
       with subtest("clean shutdown on SIGTERM"):
-          mercury.succeed(f"{pod} stop -t 40 mercury")
-          exit_code = mercury.succeed(f"{pod} wait mercury").strip()
+          mercury.succeed(f"{pod} stop -t 40 mercury-ro")
+          exit_code = mercury.succeed(f"{pod} wait mercury-ro").strip()
           # The entrypoint stops all services on SIGTERM and exits 0; some
           # conmon versions report 255 because they never receive SIGCHLD
           # for containers whose init is not their direct child (cosmetic

@@ -1,6 +1,8 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Reflection;
+using System.Security.Claims;
 using System.Text;
+using System.Threading.RateLimiting;
 using backend.Auth;
 using backend.Configuration;
 using backend.Errors;
@@ -10,6 +12,7 @@ using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Mvc.Controllers;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 
 using System.Net;
@@ -75,10 +78,15 @@ builder.Services.AddAuthentication(options =>
 {
     // Explicit policy instead of browser/env defaults: cookies only over
     // HTTPS (the container contract terminates TLS upstream) and Lax so
-    // cross-site POSTs never carry the session.
+    // cross-site POSTs never carry the session. Absolute 12-hour expiry
+    // with no sliding bounds how long a stale role stamp or a stolen
+    // cookie stays usable; re-login is the plain challenge flow, which is
+    // invisible while the IdP's SSO session is alive.
     options.Cookie.HttpOnly = true;
     options.Cookie.SameSite = SameSiteMode.Lax;
     options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+    options.ExpireTimeSpan = TimeSpan.FromHours(12);
+    options.SlidingExpiration = false;
 })
 .AddOpenIdConnect(options =>
 {
@@ -168,6 +176,39 @@ builder.Services.AddAuthorizationBuilder()
     .AddPolicy("IsAdmin", p => p.AddRequirements(new IsAdminRequirement()))
     .SetFallbackPolicy(requireAuthPolicy);
 
+// Requests are throttled per authenticated user (a single ceiling across
+// every endpoint); anonymous traffic is throttled per client IP only where a
+// policy is attached — currently /api/login, the one anonymous entry point
+// worth flooding. The IP partition relies on the forwarded-headers
+// middleware having already replaced RemoteIpAddress with the real client
+// address (terminator → TrustedProxies chain; see docs/DEPLOYMENT.md).
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+    options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(context =>
+    {
+        var user = context.User.FindFirstValue("local_userid");
+        if (user is null)
+            return RateLimitPartition.GetNoLimiter<string>("anonymous");
+
+        return RateLimitPartition.GetFixedWindowLimiter(user, _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = 600,
+            Window = TimeSpan.FromMinutes(1),
+        });
+    });
+
+    options.AddPolicy("login", context =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            context.Connection.RemoteIpAddress?.ToString() ?? "unroutable",
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 30,
+                Window = TimeSpan.FromMinutes(1),
+            }));
+});
+
 var app = builder.Build();
 
 app.UseForwardedHeaders();
@@ -206,6 +247,7 @@ if (app.Environment.IsDevelopment())
 
 // app.UseHttpsRedirection();
 app.UseAuthentication();
+app.UseRateLimiter();
 app.UseAuthorization();
 
 

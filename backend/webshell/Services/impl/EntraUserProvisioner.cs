@@ -38,6 +38,11 @@ class EntraUserProvisioner(EntraConfigurationValue entraConfig, IImageStorage im
             principal.Identities.First().AddClaim(new Claim("mercury.role", input.Role));
     }
 
+    public Task RollbackPendingWritesAsync(CancellationToken ct)
+        => pendingPictureId is { } id ? imageStorage.DeleteAsync(ProfilePictureArea, id, ct) : Task.CompletedTask;
+
+    private Guid? pendingPictureId;
+
     private async Task<Guid?> StoreProfilePictureAsync(string accessToken, CancellationToken ct)
     {
         using var client = httpClientFactory.CreateClient();
@@ -49,6 +54,8 @@ class EntraUserProvisioner(EntraConfigurationValue entraConfig, IImageStorage im
             return null;
 
         await using var stream = await response.Content.ReadAsStreamAsync(ct);
-        return await imageStorage.StoreAsync(ProfilePictureArea, stream, ct);
+        var storedId = await imageStorage.StoreAsync(ProfilePictureArea, stream, ct);
+        pendingPictureId = storedId;
+        return storedId;
     }
 }

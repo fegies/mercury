@@ -41,6 +41,12 @@ nix develop          # enter the dev shell (dotnet, node, postgres, …)
 devenv up            # start the dev PostgreSQL (database "mercury")
 ```
 
+The dev shell exports `ConnectionStrings__DefaultConnection`, pointing at
+the devenv PostgreSQL socket (trust auth as your OS user); the backend
+reads it from the environment — `appsettings.json` ships no credentials.
+Without the devenv shell, set the variable yourself (`backend/.env` is
+gitignored).
+
 Then, in two terminals:
 
 ```bash

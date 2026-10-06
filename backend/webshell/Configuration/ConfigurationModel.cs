@@ -24,10 +24,33 @@ public class BackendConfig
     /// </summary>
     public AuctionConfig AuctionConfig { get; init; } = new();
 
+    /// <summary>
+    /// Image storage options
+    /// </summary>
+    public ImageStorageConfigurationValue ImageStorage { get; init; } = new();
+
+    /// <summary>
+    /// Forwarded headers (reverse proxy) options
+    /// </summary>
+    public ForwardedConfigurationValue ForwardedConfig { get; init; } = new();
+
     internal void Validate()
     {
         var ctx = new ValidationContext(this);
         Validator.ValidateObject(this, ctx, true);
         OidcConfig.Validate();
+
+        // Validation attributes are not evaluated on nested config objects
+        // (Validator.ValidateObject does not recurse), so nested rules are
+        // checked explicitly here.
+        if (string.IsNullOrWhiteSpace(ImageStorage.BasePath))
+            throw new ValidationException("ImageStorage:BasePath must not be empty.");
+
+        foreach (var proxy in ForwardedConfig.TrustedProxies)
+        {
+            if (!System.Net.IPAddress.TryParse(proxy, out _))
+                throw new ValidationException(
+                    $"ForwardedConfig:TrustedProxies contains an invalid IP address: '{proxy}'");
+        }
     }
 }

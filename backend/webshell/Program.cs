@@ -8,8 +8,11 @@ using backend.Services;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Mvc.Controllers;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
+
+using System.Net;
 
 using appcore;
 using appcore.Infra;
@@ -23,14 +26,21 @@ var IsRealLaunch = Assembly.GetEntryAssembly() == Assembly.GetExecutingAssembly(
 var config = new BackendConfig();
 builder.Configuration.Bind(config);
 if (IsRealLaunch)
+{
     config.Validate();
+
+    if (string.IsNullOrWhiteSpace(builder.Configuration.GetConnectionString("DefaultConnection")))
+        throw new InvalidOperationException(
+            "No PostgreSQL connection string configured. Set ConnectionStrings__DefaultConnection "
+            + "(Npgsql format, e.g. \"Host=db;Port=5432;Database=mercury;Username=mercury;Password=...\").");
+}
 
 builder.RegisterAppcoreServices();
 
 builder.Services.AddSingleton(config);
 builder.Services.AddSingleton(config.AuctionConfig);
 builder.Services.AddScoped<UserProvisionService>();
-builder.Services.AddSingleton<IImageStorage, ImageStorageService>();
+builder.Services.AddSingleton<IImageStorage>(new ImageStorageService(config.ImageStorage.BasePath!));
 
 switch (config.OidcConfig.ProviderType)
 {
@@ -92,6 +102,24 @@ builder.Services.ConfigureHttpJsonOptions(options =>
 
 builder.Services.AddControllers();
 
+// Reconstruct the original request's scheme, host, and client IP from the
+// standard X-Forwarded-* headers set by the reverse proxy chain in front of
+// this backend (e.g. the container's nginx, plus the TLS terminator ahead of
+// it). Loopback proxies (the container's nginx) are trusted by default;
+// additional ones are configured via ForwardedConfig__TrustedProxies__N.
+// The flags-enum cannot be bound from configuration (the binder does not
+// convert the string form), so the defaults live here in code.
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders =
+        ForwardedHeaders.XForwardedFor
+        | ForwardedHeaders.XForwardedProto
+        | ForwardedHeaders.XForwardedHost;
+
+    foreach (var proxy in config.ForwardedConfig.TrustedProxies)
+        options.KnownProxies.Add(IPAddress.Parse(proxy));
+});
+
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi("backend", options =>
 {
@@ -124,6 +152,8 @@ builder.Services.AddAuthorizationBuilder()
     .SetFallbackPolicy(requireAuthPolicy);
 
 var app = builder.Build();
+
+app.UseForwardedHeaders();
 
 app.Use(async (ctx, next) =>
 {

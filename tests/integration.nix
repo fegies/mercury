@@ -187,14 +187,12 @@ in
                 proxyPass = "http://127.0.0.1:5023";
                 extraConfig = "proxy_set_header Host $host;";
               };
-              "= /signedout" = {
-                proxyPass = "http://127.0.0.1:5023";
-                extraConfig = "proxy_set_header Host $host;";
-              };
               "/api/" = {
                 proxyPass = "http://127.0.0.1:5023";
                 extraConfig = "proxy_set_header Host $host;";
               };
+              # / (incl. the styled /signedout landing page) is served by the
+              # frontend, exactly like the container deployment.
               "/" = {
                 proxyPass = "http://127.0.0.1:3000";
                 extraConfig = "proxy_set_header Host $host;";

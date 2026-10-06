@@ -11,6 +11,7 @@ devenv.local.nix
 backend/.env
 
 result
+result-*
 
 backend/**/obj
 backend/**/bin

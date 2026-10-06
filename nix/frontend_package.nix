@@ -3,7 +3,7 @@
 , buildNpmPackage
 }:
 buildNpmPackage rec {
-  pname = "projectpsi-frontend";
+  pname = "mercury-frontend";
   version = "0.0.1";
 
   src = sources;

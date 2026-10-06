@@ -46,6 +46,19 @@ devenv up       # Start PostgreSQL service
 nix develop     # Enter dev shell
 ```
 
+### Deployment
+
+The app ships as a single OCI container (nginx reverse proxy + SvelteKit
+frontend + ASP.NET Core backend, tini as PID 1, fully rootless):
+
+```bash
+nix build .#container && docker load -i ./result
+```
+
+Container smoke test: `nix build .#tests.<system>.container`. Configuration
+(Postgres connection string, OIDC, volumes, TLS contract) is documented in
+`docs/DEPLOYMENT.md`.
+
 ## Code Style
 
 ### Frontend (TypeScript/Svelte)

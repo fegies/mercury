@@ -69,6 +69,8 @@
       forEachSystem
       (system: let
         pkgs = nixpkgs.legacyPackages.${system};
+        backend = self.packages.${system}.server;
+        frontend = pkgs.callPackage (import ./nix/frontend_package.nix) {sources = ./frontend;};
       in {
         devenv-up = self.devShells.${system}.default.config.procfileScript;
 
@@ -77,9 +79,17 @@
           sources = ./backend;
         };
         # alias matching the rest of the repo
-        backend = self.packages.${system}.server;
+        inherit backend;
 
-        frontend = pkgs.callPackage (import ./nix/frontend_package.nix) {sources = ./frontend;};
+        inherit frontend;
+
+        # All-in-one rootless OCI container: nginx reverse proxy + SvelteKit
+        # frontend + ASP.NET Core backend, started by an entrypoint script
+        # under tini as PID 1. See docs/DEPLOYMENT.md.
+        container = pkgs.callPackage (import ./nix/container.nix) {
+          inherit backend frontend;
+          nodejs = pkgs.nodejs_26;
+        };
 
         # Mock OpenID Connect provider used by the integration tests.
         oidc-provider-mock = pkgs.callPackage (import ./nix/oidc_mock.nix) {};
@@ -113,6 +123,13 @@
           inherit nixpkgs system;
           backend = self.packages.${system}.server;
           frontend = self.packages.${system}.frontend;
+          oidc-provider-mock = self.packages.${system}.oidc-provider-mock;
+        };
+
+        # Smoke test for the OCI container image (see docs/DEPLOYMENT.md).
+        container = import ./tests/container.nix {
+          inherit nixpkgs system;
+          container = self.packages.${system}.container;
           oidc-provider-mock = self.packages.${system}.oidc-provider-mock;
         };
       });

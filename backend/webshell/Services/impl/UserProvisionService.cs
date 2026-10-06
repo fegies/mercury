@@ -19,16 +19,27 @@ internal class UserProvisionService(IncomingEventHandler<ProvisionUserInput, Use
         if (existingUserId.HasValue)
             input = input with { ExistingUserId = existingUserId };
 
-        var result = await handler.Execute(input, CancellationToken.None);
+        try
+        {
+            var result = await handler.Execute(input, CancellationToken.None);
 
-        // ensure that the local userid claim is not present
-        var previous_id_claims = principal.FindAll("local_userid").ToList();
-        if (previous_id_claims.Count > 0)
-            foreach (var identity in principal.Identities)
-                foreach (var claim in previous_id_claims)
-                    identity.TryRemoveClaim(claim);
+            // ensure that the local userid claim is not present
+            var previous_id_claims = principal.FindAll("local_userid").ToList();
+            if (previous_id_claims.Count > 0)
+                foreach (var identity in principal.Identities)
+                    foreach (var claim in previous_id_claims)
+                        identity.TryRemoveClaim(claim);
 
-        principal.Identities.First().AddClaim(new Claim("local_userid", result.UserId.ToString()));
+            principal.Identities.First().AddClaim(new Claim("local_userid", result.UserId.ToString()));
+        }
+        catch
+        {
+            // The provisioner may have staged blobs (e.g. an Entra photo) that
+            // the events were supposed to reference; a failed append would
+            // orphan them. Clean up, then surface the failure.
+            await provisioner.RollbackPendingWritesAsync(CancellationToken.None);
+            throw;
+        }
 
         // session refreshes re-run provisioning on a principal that already
         // carries a role stamp; clear it so ApplyClaims re-stamps exactly once.

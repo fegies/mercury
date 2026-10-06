@@ -321,6 +321,18 @@ public class AuctionController(
             Images = imageRefs,
         };
 
-        await addImagesHandler.Execute(addedEvent, ct);
+        try
+        {
+            await addImagesHandler.Execute(addedEvent, ct);
+        }
+        catch
+        {
+            // The blobs were written before the event; a failed append would
+            // leave them unreferenced forever. Best-effort cleanup, then
+            // rethrow for the error pipeline.
+            foreach (var image in imageRefs)
+                await imageStorage.DeleteAsync(ImageArea, image.Id, CancellationToken.None);
+            throw;
+        }
     }
 }

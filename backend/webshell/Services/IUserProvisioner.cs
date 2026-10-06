@@ -28,4 +28,11 @@ interface IUserProvisioner
     /// Stamp provider-specific claims (e.g. mercury.role) onto the authenticated principal.
     /// </summary>
     void ApplyClaims(ClaimsPrincipal principal, ProvisionUserInput input);
+
+    /// <summary>
+    /// Discard resources the provisioner staged while building the input
+    /// (e.g. an Entra profile-photo blob) when the provisioning events
+    /// could not be appended. Default: nothing was staged.
+    /// </summary>
+    Task RollbackPendingWritesAsync(CancellationToken ct) => Task.CompletedTask;
 }

@@ -75,13 +75,13 @@ public sealed class IncomingEventHandler<TInput, TResult>(
 			catch (ConcurrencyConflictException ex)
 			{
 				if (attempt >= options.MaxAttempts - 1)
-					throw new InvalidOperationException("Event handler did not converge after repeated attempts.", ex);
+					throw new ConvergenceException("Event handler did not converge after repeated attempts.", ex);
 				await Task.Delay(TimeSpan.FromMilliseconds(Math.Pow(2, attempt)), ct);
 			}
 			catch (NpgsqlException ex) when (ex.IsTransient)
 			{
 				if (attempt >= options.MaxAttempts - 1)
-					throw new InvalidOperationException("Event handler did not converge after repeated attempts.", ex);
+					throw new ConvergenceException("Event handler did not converge after repeated attempts.", ex);
 				await Task.Delay(TimeSpan.FromMilliseconds(Math.Pow(2, attempt)), ct);
 			}
 		}

@@ -129,7 +129,14 @@ public class DbEventStore(NpgsqlDataSource _datasource, IAppBus? _bus = null) : 
 
 		batch.BatchCommands.Add(new NpgsqlBatchCommand("COMMIT"));
 
-		await batch.ExecuteNonQueryAsync(ct);
+		try
+		{
+			await batch.ExecuteNonQueryAsync(ct);
+		}
+		catch (PostgresException ex) when (TranslateConcurrencyError(ex) is { } conflict)
+		{
+			throw conflict;
+		}
 
 		// The commit succeeded (the batch is BEGIN..COMMIT in one roundtrip); wake any in-memory
 		// consumers with the typed events so they can react without polling the durable log again.
@@ -137,6 +144,20 @@ public class DbEventStore(NpgsqlDataSource _datasource, IAppBus? _bus = null) : 
 			foreach (var domainEvent in events)
 				await _bus.EmitAsync(domainEvent, ct);
 	}
+
+	/// <summary>
+	/// The append conflict is signalled by a plpgsql assert inside the append
+	/// batch (default SQLSTATE P0001 carrying a marker message), not by a
+	/// dedicated error code. This maps that one error — and only that one —
+	/// onto <see cref="ConcurrencyConflictException"/> so the operation
+	/// handler's retry loop engages for the database-backed store too.
+	/// Returns null for everything else, which lets the exception propagate.
+	/// </summary>
+	public static ConcurrencyConflictException? TranslateConcurrencyError(PostgresException ex)
+		=> ex.SqlState == "P0001" && ex.MessageText == "mercury_err_concurrency_conflict"
+			? new ConcurrencyConflictException(
+				"Concurrent append detected by the event store boundary check.", ex)
+			: null;
 
 	private static (string Sql, List<NpgsqlParameter> Parameters) BuildBoundaryPredicate(IReadOnlyList<EventSelector> boundary)
 	{

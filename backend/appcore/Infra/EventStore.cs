@@ -37,7 +37,16 @@ public sealed record ConsistencyBoundary(IReadOnlyList<EventSelector> Selectors,
 	};
 }
 
-public sealed class ConcurrencyConflictException : Exception;
+public sealed class ConcurrencyConflictException(string? message = null, Exception? innerException = null)
+	: Exception(message, innerException);
+
+/// <summary>
+/// The event handler kept losing the append race past the configured retry
+/// budget. Raised instead of a generic exception so callers (e.g. the auction
+/// expiry worker) can react specifically — re-arm and try again later.
+/// </summary>
+public sealed class ConvergenceException(string message, Exception innerException)
+	: Exception(message, innerException);
 
 public interface IEventStore
 {

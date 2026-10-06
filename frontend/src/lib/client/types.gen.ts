@@ -403,6 +403,15 @@ export type GetApiEventsStreamData = {
     url: '/api/events/stream';
 };
 
+export type GetApiEventsStreamErrors = {
+    /**
+     * Too Many Requests
+     */
+    429: ProblemDetails;
+};
+
+export type GetApiEventsStreamError = GetApiEventsStreamErrors[keyof GetApiEventsStreamErrors];
+
 export type GetApiEventsStreamResponses = {
     /**
      * OK

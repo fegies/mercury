@@ -2,7 +2,7 @@
 
 import { type Client, type ClientMeta, formDataBodySerializer, type Options as Options2, type RequestResult, type ServerSentEventsResult, type TDataShape } from './client';
 import { client } from './client.gen';
-import type { DeleteApiAuctionsByIdImagesByImageIdData, DeleteApiAuctionsByIdImagesByImageIdErrors, DeleteApiAuctionsByIdImagesByImageIdResponses, GetApiAuctionsByAuctionIdImagesByImageIdData, GetApiAuctionsByAuctionIdImagesByImageIdErrors, GetApiAuctionsByAuctionIdImagesByImageIdResponses, GetApiAuctionsByIdData, GetApiAuctionsByIdErrors, GetApiAuctionsByIdResponses, GetApiAuctionsData, GetApiAuctionsResponses, GetApiEventsStreamData, GetApiEventsStreamResponse, GetApiEventsStreamResponses, GetApiProfilepicturesByIdData, GetApiProfilepicturesByIdErrors, GetApiProfilepicturesByIdResponses, GetApiUserinfoMeData, GetApiUserinfoMeResponses, PatchApiAuctionsByIdData, PatchApiAuctionsByIdErrors, PatchApiAuctionsByIdResponses, PostApiAuctionsByIdBidData, PostApiAuctionsByIdBidErrors, PostApiAuctionsByIdBidResponses, PostApiAuctionsByIdCancelData, PostApiAuctionsByIdCancelErrors, PostApiAuctionsByIdCancelResponses, PostApiAuctionsByIdCloseData, PostApiAuctionsByIdCloseErrors, PostApiAuctionsByIdCloseResponses, PostApiAuctionsByIdExtendCloseData, PostApiAuctionsByIdExtendCloseErrors, PostApiAuctionsByIdExtendCloseResponses, PostApiAuctionsByIdImagesData, PostApiAuctionsByIdImagesErrors, PostApiAuctionsByIdImagesResponses, PostApiAuctionsData, PostApiAuctionsErrors, PostApiAuctionsResponses } from './types.gen';
+import type { DeleteApiAuctionsByIdImagesByImageIdData, DeleteApiAuctionsByIdImagesByImageIdErrors, DeleteApiAuctionsByIdImagesByImageIdResponses, GetApiAuctionsByAuctionIdImagesByImageIdData, GetApiAuctionsByAuctionIdImagesByImageIdErrors, GetApiAuctionsByAuctionIdImagesByImageIdResponses, GetApiAuctionsByIdData, GetApiAuctionsByIdErrors, GetApiAuctionsByIdResponses, GetApiAuctionsData, GetApiAuctionsResponses, GetApiEventsStreamData, GetApiEventsStreamErrors, GetApiEventsStreamResponse, GetApiEventsStreamResponses, GetApiProfilepicturesByIdData, GetApiProfilepicturesByIdErrors, GetApiProfilepicturesByIdResponses, GetApiUserinfoMeData, GetApiUserinfoMeResponses, PatchApiAuctionsByIdData, PatchApiAuctionsByIdErrors, PatchApiAuctionsByIdResponses, PostApiAuctionsByIdBidData, PostApiAuctionsByIdBidErrors, PostApiAuctionsByIdBidResponses, PostApiAuctionsByIdCancelData, PostApiAuctionsByIdCancelErrors, PostApiAuctionsByIdCancelResponses, PostApiAuctionsByIdCloseData, PostApiAuctionsByIdCloseErrors, PostApiAuctionsByIdCloseResponses, PostApiAuctionsByIdExtendCloseData, PostApiAuctionsByIdExtendCloseErrors, PostApiAuctionsByIdExtendCloseResponses, PostApiAuctionsByIdImagesData, PostApiAuctionsByIdImagesErrors, PostApiAuctionsByIdImagesResponses, PostApiAuctionsData, PostApiAuctionsErrors, PostApiAuctionsResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -166,7 +166,8 @@ export class BackendClient extends HeyApiClient {
     }
     
     /**
-     * Serves an auction image by id.
+     * Serves an auction image by id. The image must belong to the auction in
+     * the URL; images of unpublished auctions are only visible to admins.
      */
     public getApiAuctionsByAuctionIdImagesByImageId<ThrowOnError extends boolean = false>(options: Options<GetApiAuctionsByAuctionIdImagesByImageIdData, ThrowOnError>): RequestResult<GetApiAuctionsByAuctionIdImagesByImageIdResponses, GetApiAuctionsByAuctionIdImagesByImageIdErrors, ThrowOnError> {
         return (options.client ?? this.client).get<GetApiAuctionsByAuctionIdImagesByImageIdResponses, GetApiAuctionsByAuctionIdImagesByImageIdErrors, ThrowOnError>({ url: '/api/auctions/{auctionId}/images/{imageId}', ...options });
@@ -180,7 +181,7 @@ export class BackendClient extends HeyApiClient {
      * are delivered; clients reconnect automatically.
      */
     public getApiEventsStream<ThrowOnError extends boolean = false>(options?: Options<GetApiEventsStreamData, ThrowOnError, GetApiEventsStreamResponse>): Promise<ServerSentEventsResult<GetApiEventsStreamResponses>> {
-        return (options?.client ?? this.client).sse.get<GetApiEventsStreamResponses, unknown, ThrowOnError>({ url: '/api/events/stream', ...options });
+        return (options?.client ?? this.client).sse.get<GetApiEventsStreamResponses, GetApiEventsStreamErrors, ThrowOnError>({ url: '/api/events/stream', ...options });
     }
     
     /**

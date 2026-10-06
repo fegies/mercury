@@ -23,6 +23,7 @@ public class LiveController(LiveEventHub hub) : ControllerBase
     [HttpGet("stream")]
     [Authorize]
     [ProducesResponseType(typeof(LiveEvent), StatusCodes.Status200OK, "text/event-stream")]
+    [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
     public async Task GetStream([FromCurrentUser] Guid currentUserId, CancellationToken ct)
     {
         if (!hub.TryConnect(currentUserId, out var connection))

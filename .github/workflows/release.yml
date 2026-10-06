@@ -1,0 +1,40 @@
+name: Release container image
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: cachix/install-nix-action@v31
+
+      - name: Build OCI container image
+        run: nix build -L .#container
+
+      - name: Install skopeo
+        run: sudo apt-get update && sudo apt-get install -y skopeo
+
+      - name: Push image to GHCR
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          image="ghcr.io/${GITHUB_REPOSITORY,,}"
+          version="$(nix eval --raw .#container.imageTag)"
+          tag="${version}-${GITHUB_SHA:0:10}"
+          echo "Publishing ${image}:${tag} (and :latest)"
+          skopeo copy --dest-creds "x-access-token:${GITHUB_TOKEN}" \
+            docker-archive:./result "docker://${image}:${tag}"
+          skopeo copy --dest-creds "x-access-token:${GITHUB_TOKEN}" \
+            docker-archive:./result "docker://${image}:latest"

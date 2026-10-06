@@ -59,6 +59,16 @@ skopeo copy --dest-creds '<user>:<token>' \
   docker://registry.example.org/mercury/mercury:0.0.1
 ```
 
+A one-click release pipeline (GitHub Actions, runs on the GitHub push mirror)
+is provided in `.github/workflows/release.yml`: dispatching it from the
+Actions tab builds the image with Nix on a hosted runner and publishes it to
+the GitHub Container Registry — tags `latest` and
+`<version>-<short-commit-sha>` (version from `nix/container.nix`, e.g.
+`ghcr.io/<owner>/<repo>:0.0.1-a1b2c3d4e5`). It authenticates with the
+built-in `GITHUB_TOKEN` and publishes right after the build; the podman smoke
+test below is not part of the pipeline — run it locally before dispatching a
+release.
+
 The image is built for the host architecture (`x86_64-linux` by default).
 Rebuild on an aarch64 Nix machine (or a cross-building builder) for arm64
 images. The version/tag is `0.0.1` (see `version` in `nix/container.nix`).

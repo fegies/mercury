@@ -32,7 +32,9 @@ function build_authorize(event: RequestEvent): (requested_role: string) => Promi
 		if (user != null && has_role(user, requested_role)) return user;
 
 		const login_url = new URL('/api/login', event.url);
-		login_url.searchParams.append('return_to', event.url.toString());
+		// Path + query only: return_to must stay a local URL (the backend
+		// rejects absolute/foreign redirect targets).
+		login_url.searchParams.append('return_to', event.url.pathname + event.url.search);
 		throw redirect(303, login_url);
 	};
 }

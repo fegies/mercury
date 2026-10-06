@@ -167,10 +167,51 @@ public class AuctionExpiryWorkerTests
 		Assert.Null(await host.WaitForClosed(auctionId, timeout: 200));
 	}
 
+	[Fact]
+	public async Task ExhaustedRetriesReArmTheDeadlineAndCloseLater()
+	{
+		var auctionId = Guid.NewGuid();
+		var bidderId = Guid.NewGuid();
+		var deadline = _clock.GetUtcNow().UtcDateTime.AddHours(1);
+
+		var store = new FlakyAppendStore();
+		await AppendTo(store,
+			[new AuctionCreated { AuctionId = auctionId, Title = "Widget", MinimumPrice = 10m, ClosureTime = deadline },
+			 new BidPlaced { AuctionId = auctionId, BidderId = bidderId, MaximumAmount = 100m }]);
+
+		var services = new ServiceCollection();
+		services.AddSingleton<IEventStore>(store);
+		services.AddSingleton<IEventReader>(store);
+		services.AddSingleton(new AuctionConfig());
+		services.AddSingleton(new EventHandlerOptions());
+		services.AddSingleton<IDecisionFunction<AuctionClosed, bool>, CloseAuctionEvaluator>(sp =>
+			new CloseAuctionEvaluator(sp.GetRequiredService<AuctionConfig>()));
+		services.AddSingleton<IncomingEventHandler<AuctionClosed, bool>>();
+		var scopeFactory = services.BuildServiceProvider().GetRequiredService<IServiceScopeFactory>();
+
+		await using var host = new WorkerHost(_bus, store.Events,
+			new AuctionExpiryWorker(_bus, scopeFactory, _clock, NullLogger<AuctionExpiryWorker>.Instance));
+		await host.Start();
+
+		// Exactly one close cycle's worth of conflicts: all retries lose, the close
+		// exhausts into ConvergenceException, and the worker must re-arm the deadline.
+		store.FailuresRemaining = 10;
+
+		_clock.Advance(TimeSpan.FromHours(1) + TimeSpan.FromSeconds(1));
+		Assert.Null(await host.WaitForClosed(auctionId, timeout: 2500));
+
+		_clock.Advance(TimeSpan.FromSeconds(11));
+		var closed = await host.WaitForClosed(auctionId, timeout: 2500);
+		Assert.NotNull(closed);
+		Assert.Equal(AuctionCloseReason.Expired, closed.Reason);
+		Assert.Equal(bidderId, closed.WinnerUserId);
+	}
+
 	private async Task<WorkerHost> StartAsync(StoredEvent[] seed)
 	{
 		await Append(seed);
-		var host = new WorkerHost(_bus, _store, new AuctionExpiryWorker(_bus, _scopeFactory, _clock, NullLogger<AuctionExpiryWorker>.Instance));
+		var host = new WorkerHost(_bus, _store.Events,
+			new AuctionExpiryWorker(_bus, _scopeFactory, _clock, NullLogger<AuctionExpiryWorker>.Instance));
 		await host.Start();
 		return host;
 	}
@@ -184,16 +225,23 @@ public class AuctionExpiryWorkerTests
 		return Task.CompletedTask;
 	}
 
+	private async Task AppendTo(FlakyAppendStore store, StoredEvent[] events)
+	{
+		foreach (var (row, i) in events.Select(e => EventSerializer.Serialize(e)).Select((r, i) => (r, i)))
+			store.Seed([row with { SequenceId = store.Events.Count + i + 1 }]);
+		await Task.CompletedTask;
+	}
+
 	private sealed class WorkerHost : IAsyncDisposable
 	{
 		private readonly InMemoryAppBus _bus;
-		private readonly InMemoryEventStore _store;
+		private readonly IReadOnlyList<AppEvent> _events;
 		private readonly AuctionExpiryWorker _worker;
 
-		public WorkerHost(InMemoryAppBus bus, InMemoryEventStore store, AuctionExpiryWorker worker)
+		public WorkerHost(InMemoryAppBus bus, IReadOnlyList<AppEvent> events, AuctionExpiryWorker worker)
 		{
 			_bus = bus;
-			_store = store;
+			_events = events;
 			_worker = worker;
 		}
 
@@ -208,7 +256,7 @@ public class AuctionExpiryWorkerTests
 			var deadline = DateTime.UtcNow.AddMilliseconds(timeout);
 			while (DateTime.UtcNow < deadline)
 			{
-				var closed = _store.Events
+				var closed = _events
 					.Select(EventSerializer.Deserialize)
 					.OfType<AuctionClosed>()
 					.LastOrDefault(c => c.AuctionId == auctionId && c.Reason == AuctionCloseReason.Expired);
@@ -223,6 +271,37 @@ public class AuctionExpiryWorkerTests
 		{
 			await _worker.StopAsync(CancellationToken.None);
 			await _bus.StopAsync(CancellationToken.None);
+		}
+	}
+
+	/// <summary>
+	/// Delegating store whose appends throw conflicts for the first
+	/// <see cref="FailuresRemaining"/> attempts, to exercise the retry and
+	/// re-arm paths against a deadline-triggered close.
+	/// </summary>
+	private sealed class FlakyAppendStore : IEventStore, IEventReader
+	{
+		private readonly InMemoryEventStore _inner = new();
+
+		public int FailuresRemaining { get; set; }
+
+		public IEventReader Reader => this;
+
+		public IReadOnlyList<AppEvent> Events => _inner.Events;
+
+		public void Seed(IEnumerable<AppEvent> events) => _inner.Seed(events);
+
+		public Task<EventContext> Read(EventSelector[] boundary, CancellationToken ct)
+			=> _inner.Read(boundary, ct);
+
+		public async Task Append(IReadOnlyList<StoredEvent> events, ConsistencyBoundary boundary, CancellationToken ct)
+		{
+			if (FailuresRemaining > 0)
+			{
+				FailuresRemaining--;
+				throw new ConcurrencyConflictException();
+			}
+			await _inner.Append(events, boundary, ct);
 		}
 	}
 }

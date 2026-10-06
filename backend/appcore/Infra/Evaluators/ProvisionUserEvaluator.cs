@@ -10,8 +10,7 @@ public sealed record ProvisionUserInput(
 	string Name,
 	string? Email,
 	string? ProfilePictureUrl,
-	string? Role,
-	bool PreserveProfilePicture = false
+	string? Role
 );
 
 public sealed record UserProvisionResult(Guid UserId);
@@ -56,19 +55,14 @@ public class ProvisionUserEvaluator : IDecisionFunction<ProvisionUserInput, User
 
 		var events = new List<StoredEvent>();
 
-		// A preserved picture means "leave the stored one untouched": session
-		// refreshes re-provision roles without re-fetching (Entra) or clearing
-		// the profile photo.
-		var pictureUrl = input.PreserveProfilePicture ? state.ProfilePictureUrl : input.ProfilePictureUrl;
-
-		if (input.Name != state.Name || input.Email != state.Email || pictureUrl != state.ProfilePictureUrl)
+		if (input.Name != state.Name || input.Email != state.Email || input.ProfilePictureUrl != state.ProfilePictureUrl)
 		{
 			events.Add(new UserUpdated
 			{
 				UserId = state.UserId,
 				Name = input.Name != state.Name ? input.Name : null,
 				Email = input.Email != state.Email ? input.Email : null,
-				ProfilePictureUrl = pictureUrl != state.ProfilePictureUrl ? pictureUrl : null,
+				ProfilePictureUrl = input.ProfilePictureUrl != state.ProfilePictureUrl ? input.ProfilePictureUrl : null,
 			});
 		}
 

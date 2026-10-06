@@ -170,30 +170,23 @@ backend refuses to start with a plain-HTTP `OidcConfig__AuthorityUrl` (this
 is the supported escape hatch for test environments with a local mock IdP),
 and OIDC metadata over TLS is always enforced there.
 
-#### Sessions and refresh tokens
+#### Sessions
 
-Sessions are the backend's encrypted auth cookie with an **absolute 14-day
-expiry** (no sliding). To keep users signed in for that whole period, the
-backend refreshes OIDC tokens in the background: it requests the
-`offline_access` scope and, when the access token is about to expire,
-exchanges the stored refresh token at the provider's token endpoint and
-re-derives the user's roles from the freshly issued ID token — so a role
-change at the provider takes effect for active users within about an hour
-(one refresh cycle) instead of at the next login.
+Sessions are the backend's encrypted auth cookie with an **absolute 12-hour
+expiry** (no sliding). There is no background token refresh; when the cookie
+expires, the next request simply redirects through the standard OIDC
+sign-in flow. That round-trip is **invisible** while the user still holds
+an SSO session at the identity provider (the default for Zitadel/Entra
+users), so users who are actively working rarely notice it. Consequences:
 
-Requirements and behaviour:
-
-- The app registration must **allow refresh tokens** (request the
-  `offline_access` scope — Zitadel and Entra both issue refresh tokens when
-  it is granted). A provider that does not issue refresh tokens simply gets
-  the fallback behaviour: sessions end at the 14-day cap.
-- A refused refresh (`invalid_grant`, e.g. the user was disabled or the
-  token revoked at the provider) ends the local session; the next request
-  redirects through sign-in. Transient provider outages do **not** log
-  users out — the refresh is retried on a later request.
-- Tokens live only inside the encrypted auth cookie; the cookie's
-  DataProtection keys persist in the [volume](#data-volume), so sessions
-  survive container restarts.
+- A role change at the provider takes effect at the user's next sign-in, at
+  most 12 hours after their last full login.
+- A user who also ended their IdP session must sign in again explicitly —
+  the challenge becomes the regular login prompt.
+- A request that arrives after the cookie expired (e.g. a bid submitted
+  exactly then) fails with 401 instead of being silently refreshed; the
+  live-notification stream recovers on its own by re-running the sign-in
+  flow.
 
 ### Optional
 

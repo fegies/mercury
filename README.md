@@ -47,6 +47,12 @@ reads it from the environment — `appsettings.json` ships no credentials.
 Without the devenv shell, set the variable yourself (`backend/.env` is
 gitignored).
 
+For sign-in, provide the OIDC settings the same way (also via
+`backend/.env` or your shell): `OidcConfig__AuthorityUrl`,
+`OidcConfig__ClientId`, `OidcConfig__ClientSecret`, and optionally
+`OidcConfig__ProviderType` (`Zitadel`, `Entra` or `Generic`). The backend
+fails fast at startup if they are missing — never commit them.
+
 Then, in two terminals:
 
 ```bash

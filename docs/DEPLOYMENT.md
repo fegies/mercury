@@ -160,13 +160,40 @@ Notes:
 | `EntraConfig__AdminGroupIds` | JSON array of Entra group ids granting admin (Entra only) | `[]` |
 
 The redirect URI registered with the provider must be
-`https://<public-host>/signin-oidc`; the post-signout landing page is
-`https://<public-host>/signedout`.
+`https://<public-host>/signin-oidc`. Register
+`https://<public-host>/signedout` as a **post-logout redirect URI** as
+well: the UI's "sign out of SSO" action performs RP-initiated logout
+against that address (a plain logout only clears the local cookie).
 
 The authority must use **HTTPS**: outside the `Development` environment the
 backend refuses to start with a plain-HTTP `OidcConfig__AuthorityUrl` (this
 is the supported escape hatch for test environments with a local mock IdP),
 and OIDC metadata over TLS is always enforced there.
+
+#### Sessions and refresh tokens
+
+Sessions are the backend's encrypted auth cookie with an **absolute 14-day
+expiry** (no sliding). To keep users signed in for that whole period, the
+backend refreshes OIDC tokens in the background: it requests the
+`offline_access` scope and, when the access token is about to expire,
+exchanges the stored refresh token at the provider's token endpoint and
+re-derives the user's roles from the freshly issued ID token — so a role
+change at the provider takes effect for active users within about an hour
+(one refresh cycle) instead of at the next login.
+
+Requirements and behaviour:
+
+- The app registration must **allow refresh tokens** (request the
+  `offline_access` scope — Zitadel and Entra both issue refresh tokens when
+  it is granted). A provider that does not issue refresh tokens simply gets
+  the fallback behaviour: sessions end at the 14-day cap.
+- A refused refresh (`invalid_grant`, e.g. the user was disabled or the
+  token revoked at the provider) ends the local session; the next request
+  redirects through sign-in. Transient provider outages do **not** log
+  users out — the refresh is retried on a later request.
+- Tokens live only inside the encrypted auth cookie; the cookie's
+  DataProtection keys persist in the [volume](#data-volume), so sessions
+  survive container restarts.
 
 ### Optional
 
@@ -188,6 +215,13 @@ ForwardedConfig__TrustedProxies__1=10.0.0.6
 One IP per indexed variable — a comma-separated single value (e.g.
 `ForwardedConfig__TrustedProxies=10.0.0.5,10.0.0.6`) is not supported and
 would silently bind to an empty list.
+
+**Rate limiting depends on this list.** Authenticated requests are
+throttled per user; the one anonymous entry point (`/api/login`) is
+throttled **per client IP**. Unless the TLS terminator is listed in
+`ForwardedConfig__TrustedProxies__N`, the backend sees the terminator's IP
+as the client address and all anonymous users share a single throttle
+bucket — add your terminator's IP(s) so per-client limiting works.
 
 ## Data volume
 
@@ -239,6 +273,14 @@ proxy). The contract:
 Do **not** send `X-Forwarded-*` headers from untrusted clients directly to
 the container port — only the TLS terminator should reach it.
 
+**Publish only on the standard port 443.** The SvelteKit frontend checks
+form-POST origins against the request origin it derives from the forwarded
+headers (without a port); a browser always includes non-default ports in
+its `Origin` header, so a deployment on e.g. `:8443` would have every form
+POST rejected. If a non-443 port is unavoidable, set
+`ORIGIN=https://<host>:<port>` in the container environment so the
+frontend compares against the full public origin instead.
+
 ### Security headers
 
 The container's nginx stamps a baseline on every response:
@@ -250,6 +292,25 @@ at the terminator. Send e.g. `Strict-Transport-Security:
 max-age=31536000; includeSubDomains` from your ingress, and add a
 `Content-Security-Policy` there if you want one — the container will pass it
 through untouched.
+
+### Read-only root filesystem
+
+The image is prepared to run with a read-only root filesystem — the
+recommended hardening:
+
+```bash
+podman run -d --restart=on-failure --name mercury \
+  --read-only --tmpfs /tmp \
+  -p 8080:8080 \
+  -v mercury-images:/var/lib/mercury \
+  ...
+```
+
+Everything stateful already lives outside the root filesystem: nginx keeps
+its temp files under `/tmp` (the `--tmpfs /tmp` mount), ASP.NET's scratch
+space and DataProtection keys live in the `/var/lib/mercury` volume, and so
+do the uploaded images. The smoke test
+(`nix build .#tests.<system>.container`) runs this exact configuration.
 
 ## Health, logs, shutdown
 

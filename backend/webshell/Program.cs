@@ -29,6 +29,13 @@ if (IsRealLaunch)
 {
     config.Validate();
 
+    if (!builder.Environment.IsDevelopment()
+        && config.OidcConfig.AuthorityUrl?.StartsWith("http://") == true)
+        throw new InvalidOperationException(
+            "OidcConfig:AuthorityUrl uses plain HTTP, but the app runs outside Development. "
+            + "Use an HTTPS OIDC authority (plain-HTTP authorities, e.g. the mock IdP, are "
+            + "only supported with ASPNETCORE_ENVIRONMENT=Development).");
+
     if (string.IsNullOrWhiteSpace(builder.Configuration.GetConnectionString("DefaultConnection")))
         throw new InvalidOperationException(
             "No PostgreSQL connection string configured. Set ConnectionStrings__DefaultConnection "
@@ -69,10 +76,9 @@ builder.Services.AddAuthentication(options =>
 {
     var oidcConf = config.OidcConfig;
     options.Authority = oidcConf.AuthorityUrl;
-    // Metadata over plain HTTP is only acceptable for non-production
-    // authorities (e.g. a local mock IdP); HTTPS is still enforced for
-    // HTTPS authorities.
-    options.RequireHttpsMetadata = !(oidcConf.AuthorityUrl?.StartsWith("http://") ?? false);
+    // Plain-HTTP authorities (e.g. the local mock IdP) are only supported in
+    // the Development environment; see the fail-fast check below.
+    options.RequireHttpsMetadata = !builder.Environment.IsDevelopment();
     options.ClientId = oidcConf.ClientId;
     options.ClientSecret = oidcConf.ClientSecret;
     options.SignInScheme = CookieAuthenticationDefaults.AuthenticationScheme;

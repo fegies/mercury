@@ -163,6 +163,11 @@ The redirect URI registered with the provider must be
 `https://<public-host>/signin-oidc`; the post-signout landing page is
 `https://<public-host>/signedout`.
 
+The authority must use **HTTPS**: outside the `Development` environment the
+backend refuses to start with a plain-HTTP `OidcConfig__AuthorityUrl` (this
+is the supported escape hatch for test environments with a local mock IdP),
+and OIDC metadata over TLS is always enforced there.
+
 ### Optional
 
 | Variable                              | Meaning                                              | Default                    |

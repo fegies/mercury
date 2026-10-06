@@ -140,6 +140,10 @@ in
       # stdout/stderr IS the container log.
       mercury.succeed(
         f"{pod} run -d --name mercury --network=host "
+        # The mock IdP is http-only; the backend refuses plain-HTTP OIDC
+        # authorities outside the Development environment (the production
+        # posture this image otherwise enforces).
+        + "-e 'ASPNETCORE_ENVIRONMENT=Development' "
         + "-e 'ConnectionStrings__DefaultConnection=Host=127.0.0.1;Port=5432;Database=mercury;Username=mercury;Password=mercury' "
         + "-e 'OidcConfig__AuthorityUrl=http://127.0.0.1:9400' "
         + "-e 'OidcConfig__ClientId=mercury' "

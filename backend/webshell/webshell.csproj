@@ -22,6 +22,10 @@
     <ProjectReference Include="../appcore/appcore.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="appcore.Tests" />
+  </ItemGroup>
+
 
   <PropertyGroup>
     <OpenApiDocumentsDirectory>openapi</OpenApiDocumentsDirectory>

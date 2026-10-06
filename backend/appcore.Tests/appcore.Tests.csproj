@@ -20,6 +20,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\appcore\appcore.csproj" />
+    <ProjectReference Include="..\webshell\webshell.csproj" />
   </ItemGroup>
 
 </Project>

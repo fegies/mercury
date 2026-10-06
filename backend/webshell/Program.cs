@@ -1,4 +1,5 @@
 using System.IdentityModel.Tokens.Jwt;
+using System.Globalization;
 using System.Reflection;
 using System.Text;
 using backend.Auth;
@@ -44,6 +45,7 @@ if (IsRealLaunch)
 
 builder.RegisterAppcoreServices();
 
+builder.Services.AddHttpClient();
 builder.Services.AddSingleton(config);
 builder.Services.AddSingleton(config.AuctionConfig);
 builder.Services.AddScoped<UserProvisionService>();
@@ -55,7 +57,6 @@ switch (config.OidcConfig.ProviderType)
         builder.Services.AddScoped<IUserProvisioner, ZitadelUserProvisioner>();
         break;
     case OidcConfigurationValue.ProviderTypeValue.Entra:
-        builder.Services.AddHttpClient();
         builder.Services.AddScoped<IUserProvisioner>(sp => new EntraUserProvisioner(
             config.EntraConfig,
             sp.GetRequiredService<IImageStorage>(),
@@ -75,10 +76,18 @@ builder.Services.AddAuthentication(options =>
 {
     // Explicit policy instead of browser/env defaults: cookies only over
     // HTTPS (the container contract terminates TLS upstream) and Lax so
-    // cross-site POSTs never carry the session.
+    // cross-site POSTs never carry the session. Absolute 14-day expiry
+    // with no sliding: SessionRefresher keeps active sessions alive via
+    // OIDC refresh tokens, and the cap bounds how long a stale role stamp
+    // or a stolen cookie stays usable.
     options.Cookie.HttpOnly = true;
     options.Cookie.SameSite = SameSiteMode.Lax;
     options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+    options.ExpireTimeSpan = TimeSpan.FromDays(14);
+    options.SlidingExpiration = false;
+    options.Events.OnValidatePrincipal = context =>
+        context.HttpContext.RequestServices.GetRequiredService<SessionRefresher>()
+            .RefreshIfDueAsync(context);
 })
 .AddOpenIdConnect(options =>
 {
@@ -96,15 +105,30 @@ builder.Services.AddAuthentication(options =>
     options.Scope.Add("openid");
     options.Scope.Add("profile");
     options.Scope.Add("email");
+    options.Scope.Add("offline_access");
 
-    // OIDC tokens are only consumed by the Entra provisioner (Microsoft Graph
-    // profile photo fetch); avoid persisting them in the auth cookie otherwise.
-    options.SaveTokens =
-        oidcConf.ProviderType == OidcConfigurationValue.ProviderTypeValue.Entra;
+    // Tokens are persisted in the (encrypted) auth ticket: the session
+    // refresher needs the refresh/access tokens to keep sessions alive and
+    // the ID token to re-provision roles; the Entra provisioner additionally
+    // consumes the access token for the Graph profile photo.
+    options.SaveTokens = true;
     options.GetClaimsFromUserInfoEndpoint = true;
     options.TokenValidationParameters.NameClaimType = JwtRegisteredClaimNames.Name;
     options.TokenValidationParameters.RoleClaimType = "role";
     options.MapInboundClaims = false;
+
+    options.Events.OnTokenResponseReceived = (ctx) =>
+    {
+        var lifetime = ctx.ProtocolMessage?.ExpiresIn is { } raw
+                       && long.TryParse(raw, NumberStyles.Integer, CultureInfo.InvariantCulture, out var seconds)
+                       && seconds > 0
+            ? TimeSpan.FromSeconds(seconds)
+            : TimeSpan.FromHours(1);
+        if (ctx.Properties is not null)
+            ctx.Properties.Items[SessionRefresher.AccessExpiryItem] =
+                DateTimeOffset.UtcNow.Add(lifetime).ToString("o", CultureInfo.InvariantCulture);
+        return Task.CompletedTask;
+    };
 
     options.Events.OnTokenValidated = async (ctx) =>
     {
@@ -159,6 +183,7 @@ builder.Services.AddOpenApi("backend", options =>
 });
 
 builder.Services.AddSingleton<IAuthorizationHandler, IsAdminRequirementHandler>();
+builder.Services.AddSingleton<SessionRefresher>();
 
 var requireAuthPolicy = new AuthorizationPolicyBuilder()
     .RequireAuthenticatedUser()

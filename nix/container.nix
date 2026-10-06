@@ -92,6 +92,15 @@ let
         proxy_set_header X-Forwarded-Proto $forwarded_scheme;
         proxy_set_header X-Forwarded-Host $host;
 
+        # Baseline security headers for every response. nginx does not merge
+        # add_header across levels, so locations that define their own headers
+        # (the immutable assets below) must repeat these. HSTS is deliberately
+        # absent: this container speaks plain HTTP, so HSTS belongs at the TLS
+        # terminator (see docs/DEPLOYMENT.md).
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+        add_header X-Frame-Options "DENY" always;
+
       # Content-hashed build assets: served straight from the image store,
       # taking the load off the node server. Filenames change on every
       # build, so responses can be cached forever. The vite build emits
@@ -101,6 +110,9 @@ let
       location /_app/immutable/ {
         root ${frontend}/build/client;
         add_header Cache-Control "public, max-age=31536000, immutable";
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+        add_header X-Frame-Options "DENY" always;
         gzip_static on;
         access_log off;
         try_files $uri =404;

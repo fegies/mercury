@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace backend.Controllers
 {
@@ -39,6 +40,7 @@ namespace backend.Controllers
         /// </summary>
         /// <param name="return_to">An optional local page to redirect to after signin</param>
         [HttpGet("api/login")]
+        [EnableRateLimiting("login")]
         public ActionResult Login([FromQuery] string? return_to)
         {
             if (return_to != null)

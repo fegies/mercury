@@ -156,7 +156,7 @@ in
       mercury.succeed(
         f"{pod} run -d --name mercury --network=host "
         + env
-        + f"{imageRef}"
+        + "${imageRef}"
       )
 
       # If the container died at boot, dump its logs so the failure is
@@ -268,16 +268,17 @@ in
           mercury.succeed(
             f"{pod} run -d --name mercury-ro --read-only --tmpfs /tmp --network=host "
             + env
-            + f"{imageRef}"
+            + "${imageRef}"
           )
           try:
-              mercury.wait_for_open_port(8080, timeout=90)
+              mercury.wait_until_succeeds(
+                  "curl -fsS http://localhost:8080/api/healthz", timeout=90
+              )
           except Exception:
               _, logs = mercury.execute(f"{pod} logs mercury-ro")
-              print("=== read-only container logs (port 8080 never opened) ===")
+              print("=== read-only container logs (health probe failed) ===")
               print(logs)
               raise
-          mercury.succeed("curl -fsS http://localhost:8080/api/healthz")
           mercury.succeed("curl -fsS http://localhost:8080/ -o /dev/null")
 
       with subtest("clean shutdown on SIGTERM"):

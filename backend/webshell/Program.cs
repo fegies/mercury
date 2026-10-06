@@ -71,7 +71,15 @@ builder.Services.AddAuthentication(options =>
     options.DefaultScheme = CookieAuthenticationDefaults.AuthenticationScheme;
     options.DefaultChallengeScheme = OpenIdConnectDefaults.AuthenticationScheme;
 })
-.AddCookie()
+.AddCookie(options =>
+{
+    // Explicit policy instead of browser/env defaults: cookies only over
+    // HTTPS (the container contract terminates TLS upstream) and Lax so
+    // cross-site POSTs never carry the session.
+    options.Cookie.HttpOnly = true;
+    options.Cookie.SameSite = SameSiteMode.Lax;
+    options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+})
 .AddOpenIdConnect(options =>
 {
     var oidcConf = config.OidcConfig;

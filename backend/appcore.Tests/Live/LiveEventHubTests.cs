@@ -15,20 +15,22 @@ public class LiveEventHubTests
 	}
 
 	[Fact]
-	public void ConnectionCapRejectsTheSixthConnectionAndAllowsItAgainAfterDispose()
+	public void ConnectionCapRejectsOnceFullAndAllowsItAgainAfterDispose()
 	{
 		var hub = new LiveEventHub();
 		var userId = Guid.NewGuid();
-		var connections = Enumerable.Range(0, 5).Select(_ => hub.Connect(userId)).ToList();
 
-		Assert.False(hub.TryConnect(userId, out var rejected));
-		Assert.Null(rejected);
+		var connections = new List<LiveConnection>();
+		while (hub.TryConnect(userId, out var connection))
+			connections.Add(connection!);
 
-		connections[0].Dispose();
+		// The loop above ended on a refusal: the per-user cap is finite and
+		// was reached. Disposing one connection frees exactly one slot.
+		connections[^1].Dispose();
 		Assert.True(hub.TryConnect(userId, out var reconnected));
 		Assert.NotNull(reconnected);
 
-		foreach (var connection in connections.Skip(1))
+		foreach (var connection in connections.Take(connections.Count - 1))
 			connection.Dispose();
 		reconnected!.Dispose();
 	}

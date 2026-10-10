@@ -34,16 +34,6 @@ namespace backend.Controllers
             };
 
         /// <summary>
-        /// A static page shown after signout
-        /// </summary>
-        [HttpGet("/signedout")]
-        [AllowAnonymous]
-        public string SignedOutPage()
-        {
-            return "You are logged out";
-        }
-
-        /// <summary>
         /// Begin the oidc sign-in flow.
         /// </summary>
         /// <param name="return_to">An optional local page to redirect to after signin</param>

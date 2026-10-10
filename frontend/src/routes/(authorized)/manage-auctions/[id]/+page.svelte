@@ -43,6 +43,7 @@
 		action="?/update"
 		min_closure={data.auction.closureTime}
 		extend_only
+		locked={data.auction.isClosed}
 	></EditableAuction>
 </section>
 

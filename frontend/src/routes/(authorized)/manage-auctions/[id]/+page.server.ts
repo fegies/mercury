@@ -3,6 +3,15 @@ import { build_client } from '$lib/api';
 import { parse_auction_form, selected_files, to_auction } from '$lib/auction_form';
 import type { Actions, PageServerLoad, RequestEvent } from './$types';
 
+function api_error_message(apiError: unknown): string | null {
+	if (typeof apiError === 'string') return apiError;
+	if (apiError && typeof apiError === 'object' && 'detail' in apiError) {
+		const detail = (apiError as { detail?: unknown }).detail;
+		if (typeof detail === 'string') return detail;
+	}
+	return null;
+}
+
 export const load: PageServerLoad = async (event) => {
 	await event.locals.authorize('Admin');
 
@@ -23,7 +32,9 @@ export const actions = {
 		await event.locals.authorize('Admin');
 
 		const formData = await event.request.formData();
-		const { values, errors: parseErrors } = parse_auction_form(formData);
+		const { values, errors: parseErrors } = parse_auction_form(formData, {
+			allow_past_closure: true
+		});
 		const errors: string[] = [...parseErrors];
 
 		if (values && errors.length === 0) {
@@ -42,24 +53,30 @@ export const actions = {
 					body: { closureTime: values.closureTime }
 				});
 
-				if (extendError?.detail) {
-					errors.push(extendError.detail);
+				const message = api_error_message(extendError);
+				if (message) {
+					errors.push(message);
 				}
 			}
 
 			if (errors.length === 0) {
+				const body = current?.isClosed
+					? { isPublished: values.isPublished }
+					: {
+							title: values.title,
+							description: values.description,
+							minimumPrice: values.minimumPrice,
+							isPublished: values.isPublished
+						};
+
 				const { error: apiError } = await client.patchApiAuctionsById({
 					path: { id: event.params.id },
-					body: {
-						title: values.title,
-						description: values.description,
-						minimumPrice: values.minimumPrice,
-						isPublished: values.isPublished
-					}
+					body
 				});
 
-				if (apiError?.detail) {
-					errors.push(apiError.detail);
+				const message = api_error_message(apiError);
+				if (message) {
+					errors.push(message);
 				}
 			}
 		}

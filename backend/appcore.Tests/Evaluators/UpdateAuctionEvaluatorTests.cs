@@ -59,6 +59,61 @@ public class UpdateAuctionEvaluatorTests
 	}
 
 	[Fact]
+	public void Update_ClosedAuction_PublishOnly_Succeeds()
+	{
+		var auctionId = Guid.NewGuid();
+		var baseEvent = CreateBaseAppEvent(auctionId);
+		var closedEvent = new AuctionClosed
+		{
+			AuctionId = auctionId,
+			Reason = AuctionCloseReason.Manual
+		};
+		var evaluator = new UpdateAuctionEvaluator();
+		var input = new AuctionUpdated
+		{
+			AuctionId = auctionId,
+			IsPublished = false
+		};
+
+		var step = evaluator.Step(input, TestContext.From(
+			EventSerializer.Serialize(baseEvent),
+			EventSerializer.Serialize(closedEvent)));
+
+		var result = Assert.IsType<DecisionStep<bool>.Complete>(step);
+		Assert.True(result.Value);
+		var emitted = Assert.IsType<AuctionUpdated>(Assert.Single(result.EventsToAppend));
+		Assert.False(emitted.IsPublished!.Value);
+		Assert.Null(emitted.Title);
+		Assert.Null(emitted.Description);
+		Assert.Null(emitted.MinimumPrice);
+	}
+
+	[Fact]
+	public void Update_ClosedAuction_Republish_Succeeds()
+	{
+		var auctionId = Guid.NewGuid();
+		var baseEvent = CreateBaseAppEvent(auctionId);
+		var closedEvent = new AuctionClosed
+		{
+			AuctionId = auctionId,
+			Reason = AuctionCloseReason.Expired
+		};
+		var evaluator = new UpdateAuctionEvaluator();
+		var input = new AuctionUpdated
+		{
+			AuctionId = auctionId,
+			IsPublished = true
+		};
+
+		var step = evaluator.Step(input, TestContext.From(
+			EventSerializer.Serialize(baseEvent),
+			EventSerializer.Serialize(closedEvent)));
+
+		var result = Assert.IsType<DecisionStep<bool>.Complete>(step);
+		Assert.True(result.Value);
+	}
+
+	[Fact]
 	public void Update_NonexistentAuction_ThrowsInvariantViolation()
 	{
 		var evaluator = new UpdateAuctionEvaluator();

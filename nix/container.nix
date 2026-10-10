@@ -229,6 +229,9 @@ in
         "PORT=3000"
         "PROTOCOL_HEADER=x-forwarded-proto"
         "HOST_HEADER=x-forwarded-host"
+        # SSR API calls target the backend directly over the internal
+        # loopback, so the frontend never dials the public origin.
+        "MERCURY_BACKEND_URL=http://127.0.0.1:5023"
         "ASPNETCORE_ENVIRONMENT=Production"
         "ASPNETCORE_URLS=http://127.0.0.1:5023"
         "ImageStorage__BasePath=${stateDir}/data/images"

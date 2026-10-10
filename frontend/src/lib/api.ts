@@ -3,13 +3,9 @@ import { createClient } from './client/client';
 import { BackendClient } from './client/sdk.gen';
 
 export function build_client(event: RequestEvent): BackendClient {
-	const url = new URL(event.url);
-	url.pathname = '';
-	url.search = '';
-
 	const client = createClient({
-		fetch: (input, init) => event.fetch(input, { ...init, redirect: 'manual' }),
-		baseUrl: url.toString()
+		fetch: (input, init) => event.fetch(backend_request(event, input, init)),
+		baseUrl: backend_base_url(event)
 	});
 	return new BackendClient({
 		client
@@ -24,4 +20,42 @@ export function build_browser_client(): BackendClient {
 	return new BackendClient({
 		client
 	});
+}
+
+// The generated client hands fetch a single Request and no RequestInit, and
+// event.fetch ignores a RequestInit when its first argument is a Request —
+// so the request is rebuilt with manual redirect handling: a 302 from the
+// backend (e.g. the anonymous OIDC challenge) must surface to callers as
+// "signed out" instead of being followed. When the target is not the public
+// origin (the backend URL is configured directly via MERCURY_BACKEND_URL,
+// which keeps SSR calls off the public host), the browser's cookie is
+// attached explicitly; same-origin targets (the fallback when unset) keep
+// SvelteKit's own cookie forwarding. The SSR guard keeps `process` out of
+// the browser bundle.
+function backend_base_url(event: RequestEvent): string {
+	if (import.meta.env.SSR) {
+		const configured = process.env.MERCURY_BACKEND_URL?.trim();
+		if (configured) return configured.replace(/\/+$/, '');
+	}
+
+	const url = new URL(event.url);
+	url.pathname = '';
+	url.search = '';
+	return url.toString();
+}
+
+function backend_request(
+	event: RequestEvent,
+	input: RequestInfo | URL,
+	init?: RequestInit
+): Request {
+	const source = input instanceof Request ? input : new Request(input, init);
+	const request = new Request(source, { redirect: 'manual' });
+
+	if (new URL(request.url).origin !== event.url.origin) {
+		const cookie = event.request.headers.get('cookie');
+		if (cookie && !request.headers.has('cookie')) request.headers.set('cookie', cookie);
+	}
+
+	return request;
 }

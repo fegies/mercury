@@ -129,6 +129,16 @@ builder.Services.ConfigureHttpJsonOptions(options =>
     options.SerializerOptions.NumberHandling = System.Text.Json.Serialization.JsonNumberHandling.Strict;
 });
 
+// Match the 30 MiB upload ceiling the proxies ahead advertise (the
+// container's nginx client_max_body_size 30m and SvelteKit's
+// BODY_SIZE_LIMIT=30M). Kestrel's default is 30,000,000 bytes (~28.6 MiB),
+// which would reject uploads in the gap with a bare 413 after they already
+// traversed both proxies.
+builder.WebHost.ConfigureKestrel(options =>
+{
+    options.Limits.MaxRequestBodySize = 30 * 1024 * 1024;
+});
+
 builder.Services.AddControllers();
 
 // Reconstruct the original request's scheme, host, and client IP from the

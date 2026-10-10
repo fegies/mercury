@@ -286,6 +286,10 @@ public class AuctionController(
         if (path is null)
             return NotFound();
 
+        // Blob content is immutable per id (re-uploads get fresh ids), so
+        // the browser can keep it for a day; private keeps shared caches out
+        // of the authenticated content path.
+        Response.Headers.CacheControl = "private, max-age=86400";
         return PhysicalFile(path, "application/octet-stream");
     }
 

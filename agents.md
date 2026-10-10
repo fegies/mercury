@@ -36,7 +36,6 @@ npm run openapi-ts   # Regenerate API client from backend OpenAPI spec
 dotnet build                              # Build solution
 dotnet run --project webshell             # Run backend (port 5023)
 dotnet test                               # Run all tests
-dotnet tool run openapi spec --output openapi/backend.json  # Export OpenAPI spec
 ```
 
 ### Dev Environment
@@ -101,8 +100,8 @@ Container smoke test: `nix build .#tests.<system>.container`. Configuration
 
 - **All API calls MUST use the generated client.** Never call the backend with raw `fetch`/`event.fetch`/`createClient` directly — always go through `build_client(event)` and one of the `BackendClient` methods (e.g. `client.getApiAuctions`). The only exceptions are the OIDC login/logout flow (`/api/login`, `/api/logout`), which are browser redirects, not data API calls.
 - Auto-generated from OpenAPI spec via `@hey-api/openapi-ts`
-- Source: `backend/openapi/backend.json` → output: `frontend/src/lib/client/`
-- After backend controller changes: export OpenAPI spec, then run `npm run openapi-ts` in frontend
+- Source: `backend/webshell/openapi/webshell_backend.json` (regenerated on `dotnet build`) → output: `frontend/src/lib/client/`
+- After backend controller changes: rebuild the backend (`dotnet clean && dotnet build` forces spec regeneration), then run `npm run openapi-ts` in frontend
 - Client factory: `build_client(event)` in `src/lib/api.ts`
 - **No duplicate frontend types.** Use the generated `AuctionSummary`/request types from `src/lib/client/types.gen.ts` directly (re-exported via `src/lib/types/auction.ts` if convenient). To keep generated types "nice" (required vs optional fields), mark always-present C# record properties as `required` so the OpenAPI `required` array is populated.
 - Auction creation (`CreateAuction`) takes a JSON `CreateAuctionRequest` without images; upload images afterwards via `UploadImages` (`postApiAuctionsByIdImages`), which is `multipart/form-data` — array-of-file bodies must use the generated `Files` property name.
@@ -143,4 +142,4 @@ Container smoke test: `nix build .#tests.<system>.container`. Configuration
 ## Notes
 
 - The frontend is stateless: no database access and no server-side session state — pages/actions only proxy the backend API for SSR
-- **OpenAPI spec generation:** `dotnet build` generates `webshell/openapi/backend.json` but may miss newly added controllers. Run `dotnet clean && dotnet build` to force regeneration. Fallback: start the server and curl `/openapi/v1.json`.
+- **OpenAPI spec generation:** `dotnet build` generates `webshell/openapi/webshell_backend.json` but may skip regeneration on incremental builds. Run `dotnet clean && dotnet build` to force it. Fallback: start the server and curl `/openapi/backend.json`.

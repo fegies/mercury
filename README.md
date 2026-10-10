@@ -44,11 +44,11 @@ devenv up            # start the dev PostgreSQL (database "mercury")
 The dev shell exports `ConnectionStrings__DefaultConnection`, pointing at
 the devenv PostgreSQL socket (trust auth as your OS user); the backend
 reads it from the environment — `appsettings.json` ships no credentials.
-Without the devenv shell, set the variable yourself (`backend/.env` is
-gitignored).
+Without the devenv shell, export the variable yourself: the backend reads
+the process environment only and does not load `.env` files.
 
-For sign-in, provide the OIDC settings the same way (also via
-`backend/.env` or your shell): `OidcConfig__AuthorityUrl`,
+For sign-in, provide the OIDC settings the same way, as environment
+variables in your shell: `OidcConfig__AuthorityUrl`,
 `OidcConfig__ClientId`, `OidcConfig__ClientSecret`, and optionally
 `OidcConfig__ProviderType` (`Zitadel`, `Entra` or `Generic`). The backend
 fails fast at startup if they are missing — never commit them.

@@ -49,8 +49,9 @@ the process environment only and does not load `.env` files.
 
 For sign-in, provide the OIDC settings the same way, as environment
 variables in your shell: `OidcConfig__AuthorityUrl`,
-`OidcConfig__ClientId`, `OidcConfig__ClientSecret`, and optionally
-`OidcConfig__ProviderType` (`Zitadel`, `Entra` or `Generic`). The backend
+`OidcConfig__ClientId`, `OidcConfig__ClientSecret`, and
+`OidcConfig__ProviderType` (`Zitadel`, `Entra` or `Generic` — an explicit
+choice, there is no default). The backend
 fails fast at startup if they are missing — never commit them.
 
 Then, in two terminals:

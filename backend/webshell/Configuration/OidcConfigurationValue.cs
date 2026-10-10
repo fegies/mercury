@@ -46,13 +46,19 @@ public class OidcConfigurationValue
     }
 
     /// <summary>
-    /// What type of provider is this?
+    /// What type of provider is this? Deliberately no default: the provider
+    /// is a required, explicit configuration choice (the enum starts at 1,
+    /// so an unset value fails validation below with a clear message).
     /// </summary>
     [EnumDataType(typeof(ProviderTypeValue))]
     public ProviderTypeValue ProviderType { get; init; }
 
     internal void Validate()
     {
+        if (!Enum.IsDefined(typeof(ProviderTypeValue), ProviderType))
+            throw new ValidationException(
+                "OidcConfig:ProviderType must be explicitly set to one of: Zitadel, Entra or Generic.");
+
         Validator.ValidateObject(this, new ValidationContext(this), true);
     }
 }

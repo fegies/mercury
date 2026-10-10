@@ -24,6 +24,12 @@ public class ProfilePictureController(IImageStorage imageStorage) : ControllerBa
         if (path is null)
             return NotFound();
 
+        // Picture blobs are immutable per id (updates are stored under a
+        // fresh id and a fresh URL); avatars render on every page, so
+        // letting the browser keep them for a day removes most of that
+        // load. Private keeps shared caches out of the authenticated
+        // content path.
+        Response.Headers.CacheControl = "private, max-age=86400";
         return PhysicalFile(path, "application/octet-stream");
     }
 }

@@ -6,7 +6,7 @@ Self-hosted auction platform for organization-internal auctions. Users browse an
 
 | Layer | Technology | Version |
 |---|---|---|
-| Frontend | SvelteKit + Svelte 5 (runes) | 2.16 / 5.0 |
+| Frontend | SvelteKit + Svelte 5 (runes) | 2.20 / 5.25 |
 | UI | Skeleton UI (Rocket theme) + Tailwind CSS 4 | 3.1 / 4.0 |
 | Backend | ASP.NET Core (C#) | 10.0 |
 | Database | PostgreSQL via raw Npgsql (single event-sourced `app_events` table) | 10.0 |
@@ -51,7 +51,7 @@ Startup sequence:
 
 | Controller | Routes | Auth | Description |
 |---|---|---|---|
-| `OidcController` | `GET /api/logout`, `GET /api/login`, `GET /signedout` | None (hidden from OpenAPI) | OIDC login/logout flow |
+| `OidcController` | `GET /api/login`, `POST /api/logout` (optional `?idp=1` also ends the IdP SSO session) | None (hidden from OpenAPI) | OIDC login/logout flow. The styled `/signedout` landing page is served by the frontend |
 | `UserInfoController` | `GET /api/userinfo/me` | User | Returns current user info + admin flag |
 | `ProfilePictureController` | `GET /api/profilepictures/{id}` | User | Serves locally-stored profile pictures (e.g. Entra photos fetched at login) |
 | `AuctionController` | `GET/POST/PATCH /api/auctions...` | User / Admin | Auction CRUD, image upload/serve/removal |
@@ -102,13 +102,18 @@ BackendConfig
 
 - **Fallback policy:** All endpoints require authentication
 - **`IsAdmin` policy:** Checks `mercury.role == "Admin"` claim (stamped by the provider-specific provisioner at login)
-- Admin-only endpoints: `/manage-auctions/*`
+- Admin-only endpoints: auction mutations (`POST`/`PATCH`/`DELETE` under `/api/auctions`)
 
 ### Error Handling
 
 Custom `WebStatusException` hierarchy (extends `Exception`):
+- `BadRequestException` (400)
+- `NotFoundException` (404)
 - `ForbidException` (403)
-- Caught by middleware in `Program.cs` which sets the HTTP status code
+- `TooManyRequestsException` (429)
+- `InvariantViolation` → 400
+
+Caught by middleware in `Program.cs` which sets the HTTP status code
 
 ### Database Schema (PostgreSQL)
 
@@ -160,7 +165,6 @@ browsers over `GET /api/events/stream`. Built on the in-memory event bus
 
 **Route groups:**
 - `(authorized)/` — All protected pages (layout calls `locals.authorize('User')`)
-- `api/` — Server-side API routes
 - `signedout/` — Post-logout page
 
 **Routes:**
@@ -170,11 +174,9 @@ browsers over `GET /api/events/stream`. Built on the in-memory event bus
 | `/` → `/auctions` | User | Redirect | Done |
 | `/auctions` | User | Page | Done (listing) |
 | `/auctions/[id]` | User | Page | Done (detail + images) |
-| `/auctions/[id]/liveticker` | — | SSE stream | Prototype (countdown demo) |
 | `/manage-auctions` | Admin | Page | Done (hub with listing + link to create) |
 | `/manage-auctions/new` | Admin | Page + Form Action | Done (create auction) |
 | `/manage-auctions/[id]` | Admin | Page + Form Actions | Done (edit auction, images, close) |
-| `/logout` | — | GET | Done |
 | `/signedout` | — | Page | Done |
 
 SvelteKit is stateless: no database access, no server-side session state. Pages/actions only proxy the backend API (`locals.authorize()` for auth redirects); all data and files live in the backend.
@@ -191,7 +193,7 @@ SvelteKit is stateless: no database access, no server-side session state. Pages/
 
 ### API Client
 
-Auto-generated from OpenAPI spec (`backend/openapi/backend.json`) via `@hey-api/openapi-ts`:
+Auto-generated from OpenAPI spec (`backend/webshell/openapi/webshell_backend.json`) via `@hey-api/openapi-ts`:
 - Output: `src/lib/client/`
 - Single `BackendClient` class with typed SDK methods
 - Factory: `build_client(event)` in `src/lib/api.ts` creates SSR-compatible client

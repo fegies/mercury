@@ -168,7 +168,7 @@ Notes:
 | `OidcConfig__AuthorityUrl`   | OIDC issuer root URL (no `.well-known/…`)  | —        |
 | `OidcConfig__ClientId`       | Client id of this app registration         | —        |
 | `OidcConfig__ClientSecret`   | Client secret                              | —        |
-| `OidcConfig__ProviderType`   | `Zitadel`, `Entra` or `Generic`            | `Generic`|
+| `OidcConfig__ProviderType`   | `Zitadel`, `Entra` or `Generic`            | — (required choice, no default) |
 | `EntraConfig__AdminGroupIds` | JSON array of Entra group ids granting admin (Entra only) | `[]` |
 
 The redirect URI registered with the provider must be

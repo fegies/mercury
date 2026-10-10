@@ -260,22 +260,30 @@ put a TLS terminator in front of it (your ingress, load balancer, or reverse
 proxy). The contract:
 
 1. **TLS terminator → container**: must forward to the container's port 8080
-   and set `X-Forwarded-Proto: https` (and the public `Host`). Standard
-   behaviour of nginx/traefik/caddy/HAProxy deployments.
-2. **Container nginx**: appends to `X-Forwarded-For`
-   (`$proxy_add_x_forwarded_for`), passes `X-Forwarded-Proto` through
-   (falling back to `http` when absent), and sets `X-Forwarded-Host`.
+   and set `X-Forwarded-Proto: https`, the public `Host`, and
+   `X-Forwarded-For` **from the connection peer** — discarding any
+   `X-Forwarded-For` value the client sent. This strip-and-set is required:
+   the chain below passes the header through untouched, so a terminator that
+   forwarded client-supplied values would let clients spoof their address.
+   Standard behaviour of nginx/traefik/caddy/HAProxy deployments.
+2. **Container nginx**: passes `X-Forwarded-For` through untouched (the
+   terminator owns it), passes `X-Forwarded-Proto` through (falling back to
+   `http` when absent), and sets `X-Forwarded-Host`.
 3. **SvelteKit frontend**: derives the request origin dynamically from
    `X-Forwarded-Proto`/`X-Forwarded-Host` (`PROTOCOL_HEADER`/`HOST_HEADER`),
    so SSR URLs and redirects are correct on any public host. Its server-side
    API calls go straight to the backend over the container-internal loopback
-   (`MERCURY_BACKEND_URL`, set by the image) — the container does **not**
-   need to be able to reach its own public hostname.
+   (`MERCURY_BACKEND_URL`, set by the image), so the container does **not**
+   need to be able to reach its own public hostname, and they preserve the
+   client's `X-Forwarded-For` so the backend sees the real client address.
 4. **ASP.NET backend**: `ForwardedHeadersMiddleware` re-derives scheme, host
    and client IP, keeping OIDC redirect URIs and cookies correct. The
-   container's nginx (loopback) is trusted out of the box; add upstream
-   proxies via `ForwardedConfig__TrustedProxies__N` if you route through more
-   hops.
+   container's nginx (loopback) is trusted out of the box. With the
+   pass-through contract above, no further configuration is needed for a
+   single TLS terminator; `ForwardedConfig__TrustedProxies__N` is only
+   required when an upstream hop *appends* its own address to
+   `X-Forwarded-For` (e.g. a managed load balancer you cannot configure to
+   strip client-supplied values).
 
 Do **not** send `X-Forwarded-*` headers from untrusted clients directly to
 the container port — only the TLS terminator should reach it.
@@ -381,12 +389,13 @@ server {
         proxy_set_header Connection "";
 
         # Forwarded-header contract: the container must learn the *public*
-        # scheme and host. These directives overwrite anything a client
-        # sent, and X-Forwarded-For is rebuilt from $remote_addr — no
-        # forged X-Forwarded-* header reaches the container.
+        # scheme, host and client address. These directives overwrite
+        # anything a client sent — X-Forwarded-For is set from the
+        # connection peer ($remote_addr), discarding any client-supplied
+        # value, so no forged X-Forwarded-* header reaches the container.
         proxy_set_header Host $host;
         proxy_set_header X-Forwarded-Proto https;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-For $remote_addr;
 
         # Server-sent events (live bid notifications) are long-lived and
         # unbuffered; the backend also sends X-Accel-Buffering: no.

@@ -9,7 +9,7 @@ namespace backend.Controllers;
 
 [Route("api/events")]
 [ApiController]
-public class LiveController(LiveEventHub hub) : ControllerBase
+public class LiveController(LiveEventHub hub, IHostApplicationLifetime _host_lifetime) : ControllerBase
 {
     private static readonly JsonSerializerOptions SerializerOptions = new(JsonSerializerDefaults.Web);
 
@@ -26,6 +26,9 @@ public class LiveController(LiveEventHub hub) : ControllerBase
     [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
     public async Task GetStream([FromCurrentUser] Guid currentUserId, CancellationToken ct)
     {
+        using var linked_source = CancellationTokenSource.CreateLinkedTokenSource(ct, _host_lifetime.ApplicationStopping);
+        ct = linked_source.Token;
+
         if (!hub.TryConnect(currentUserId, out var connection))
             throw new TooManyRequestsException(
                 "Too many live connections for this user; close unused tabs and reconnect.");

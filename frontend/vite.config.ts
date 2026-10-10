@@ -6,7 +6,7 @@ export default defineConfig({
 	plugins: [tailwindcss(), sveltekit()],
 	server: {
 		proxy: {
-			'/api': 'http://localhost:5023'
+			'/api': { target: 'http://localhost:5023', xfwd: true }
 			// "/oauth/flows": "http://localhost:8000"
 		}
 	},

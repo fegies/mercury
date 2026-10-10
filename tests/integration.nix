@@ -37,8 +37,7 @@
   backend,
   frontend,
   oidc-provider-mock,
-}:
-let
+}: let
   pkgs = nixpkgs.legacyPackages.${system};
 
   # A self-contained Playwright driver. Installed as a binary on the test node
@@ -58,7 +57,7 @@ let
       sub = "admin";
       email = "admin@example.com";
       name = "Admin User";
-      roles = [ "role.admin" ];
+      roles = ["role.admin"];
     }
     {
       sub = "bidder";
@@ -79,7 +78,7 @@ let
       sub = "mobile-admin";
       email = "mobile-admin@example.com";
       name = "Mobile Admin";
-      roles = [ "role.admin" ];
+      roles = ["role.admin"];
     }
   ]);
 in
@@ -90,120 +89,118 @@ in
     # Only run on Linux; QEMU-based NixOS tests are not supported on macOS.
     meta.maintainers = [];
 
-    nodes.mercury =
-      {
-        pkgs,
-        lib,
-        ...
-      }: {
-        # Use several vCPUs so the VM (and the browser) boot and run faster.
-        virtualisation.cores = 8;
-        virtualisation.memorySize = 4096;
+    nodes.mercury = {
+      pkgs,
+      lib,
+      ...
+    }: {
+      # Use several vCPUs so the VM (and the browser) boot and run faster.
+      virtualisation.cores = 8;
+      virtualisation.memorySize = 4096;
 
-        environment.systemPackages = [pkgs.postgresql browserTest];
-        environment.variables.PLAYWRIGHT_BROWSERS_PATH = pkgs.playwright-driver.browsers;
+      environment.systemPackages = [pkgs.postgresql browserTest];
+      environment.variables.PLAYWRIGHT_BROWSERS_PATH = pkgs.playwright-driver.browsers;
 
-        # ---- PostgreSQL -----------------------------------------------------
-        services.postgresql = {
-          enable = true;
-          package = pkgs.postgresql_16;
-          authentication = lib.mkForce ''
-            local all all trust
-            host  all all 127.0.0.1/32 trust
-            host  all all ::1/128 trust
-          '';
-          initialScript = pkgs.writeText "init-mercury.sql" ''
-            CREATE ROLE mercury WITH LOGIN PASSWORD 'mercury';
-            CREATE DATABASE mercury OWNER mercury;
-          '';
+      # ---- PostgreSQL -----------------------------------------------------
+      services.postgresql = {
+        enable = true;
+        package = pkgs.postgresql_16;
+        authentication = lib.mkForce ''
+          local all all trust
+          host  all all 127.0.0.1/32 trust
+          host  all all ::1/128 trust
+        '';
+        initialScript = pkgs.writeText "init-mercury.sql" ''
+          CREATE ROLE mercury WITH LOGIN PASSWORD 'mercury';
+          CREATE DATABASE mercury OWNER mercury;
+        '';
+      };
+
+      # ---- Mock OIDC provider ---------------------------------------------
+      systemd.services.oidc-provider-mock = {
+        description = "Mock OpenID Connect provider";
+        wantedBy = ["multi-user.target"];
+        after = ["network.target"];
+        serviceConfig = {
+          ExecStart = "${oidc-provider-mock}/bin/oidc-provider-mock -H 127.0.0.1 -p 9400 --user-claims-file ${oidcUsers}";
+          DynamicUser = true;
+          Restart = "on-failure";
         };
+      };
 
-        # ---- Mock OIDC provider ---------------------------------------------
-        systemd.services.oidc-provider-mock = {
-          description = "Mock OpenID Connect provider";
-          wantedBy = ["multi-user.target"];
-          after = ["network.target"];
-          serviceConfig = {
-            ExecStart = "${oidc-provider-mock}/bin/oidc-provider-mock -H 127.0.0.1 -p 9400 --user-claims-file ${oidcUsers}";
-            DynamicUser = true;
-            Restart = "on-failure";
-          };
+      # ---- Backend ---------------------------------------------------------
+      systemd.services.mercury-backend = {
+        description = "Project Mercury API backend";
+        wantedBy = ["multi-user.target"];
+        after = ["postgresql.service" "oidc-provider-mock.service" "network.target"];
+        requires = ["postgresql.service"];
+        environment = {
+          ASPNETCORE_URLS = "http://127.0.0.1:5023";
+          # The backend refuses plain-HTTP OIDC authorities outside the
+          # Development environment; the mock IdP here is http-only.
+          ASPNETCORE_ENVIRONMENT = "Development";
+          ConnectionStrings__DefaultConnection = "Host=127.0.0.1;Port=5432;Database=mercury;Username=mercury;Password=mercury";
+          OidcConfig__AuthorityUrl = "http://127.0.0.1:9400";
+          OidcConfig__ClientId = "mercury";
+          OidcConfig__ClientSecret = "mercury";
+          OidcConfig__ProviderType = "Generic";
         };
-
-        # ---- Backend ---------------------------------------------------------
-        systemd.services.mercury-backend = {
-          description = "Project Mercury API backend";
-          wantedBy = ["multi-user.target"];
-          after = ["postgresql.service" "oidc-provider-mock.service" "network.target"];
-          requires = ["postgresql.service"];
-          environment = {
-            ASPNETCORE_URLS = "http://127.0.0.1:5023";
-            # The backend refuses plain-HTTP OIDC authorities outside the
-            # Development environment; the mock IdP here is http-only.
-            ASPNETCORE_ENVIRONMENT = "Development";
-            ConnectionStrings__DefaultConnection = "Host=127.0.0.1;Port=5432;Database=mercury;Username=mercury;Password=mercury";
-            OidcConfig__AuthorityUrl = "http://127.0.0.1:9400";
-            OidcConfig__ClientId = "mercury";
-            OidcConfig__ClientSecret = "mercury";
-            OidcConfig__ProviderType = "Generic";
-          };
-          serviceConfig = {
-            ExecStart = "${backend}/bin/webshell";
-            ExecStartPre = "${pkgs.postgresql}/bin/pg_isready -h 127.0.0.1 -p 5432";
-            Restart = "on-failure";
-            DynamicUser = true;
-            # ImageStorageService resolves its image directory relative to the
-            # process working directory ("data/images"); anchor it in the
-            # writable state directory instead of the read-only root.
-            StateDirectory = "mercury";
-            WorkingDirectory = "/var/lib/mercury";
-          };
+        serviceConfig = {
+          ExecStart = "${backend}/bin/webshell";
+          ExecStartPre = "${pkgs.postgresql}/bin/pg_isready -h 127.0.0.1 -p 5432";
+          Restart = "on-failure";
+          DynamicUser = true;
+          # ImageStorageService resolves its image directory relative to the
+          # process working directory ("data/images"); anchor it in the
+          # writable state directory instead of the read-only root.
+          StateDirectory = "mercury";
+          WorkingDirectory = "/var/lib/mercury";
         };
+      };
 
-        # ---- Frontend ---------------------------------------------------------
-        systemd.services.mercury-frontend = {
-          description = "Project Mercury SvelteKit frontend";
-          wantedBy = ["multi-user.target"];
-          after = ["network.target"];
-          environment = {
-            HOST = "127.0.0.1";
-            PORT = "3000";
-            ORIGIN = "http://localhost";
-            NODE_ENV = "production";
-          };
-          serviceConfig = {
-            ExecStart = "${pkgs.nodejs_26}/bin/node ${frontend}/build/index.js";
-            Restart = "on-failure";
-            DynamicUser = true;
-          };
+      # ---- Frontend ---------------------------------------------------------
+      systemd.services.mercury-frontend = {
+        description = "Project Mercury SvelteKit frontend";
+        wantedBy = ["multi-user.target"];
+        after = ["network.target"];
+        environment = {
+          HOST = "127.0.0.1";
+          PORT = "3000";
+          ORIGIN = "http://localhost";
+          NODE_ENV = "production";
         };
+        serviceConfig = {
+          ExecStart = "${pkgs.nodejs_26}/bin/node ${frontend}/build/index.js";
+          Restart = "on-failure";
+          DynamicUser = true;
+        };
+      };
 
-        # ---- Reverse proxy -----------------------------------------------------
-        services.nginx = {
-          enable = true;
-          virtualHosts."localhost" = {
-            listen = [
-              {addr = "0.0.0.0"; port = 80;}
-            ];
-            locations = {
-              "= /signin-oidc" = {
-                proxyPass = "http://127.0.0.1:5023";
-                extraConfig = "proxy_set_header Host $host;";
-              };
-              "/api/" = {
-                proxyPass = "http://127.0.0.1:5023";
-                extraConfig = "proxy_set_header Host $host;";
-              };
-              # / (incl. the styled /signedout landing page) is served by the
-              # frontend, exactly like the container deployment.
-              "/" = {
-                proxyPass = "http://127.0.0.1:3000";
-                extraConfig = "proxy_set_header Host $host;";
-              };
+      # ---- Reverse proxy -----------------------------------------------------
+      services.nginx = {
+        enable = true;
+        virtualHosts."localhost" = {
+          listen = [
+            {
+              addr = "0.0.0.0";
+              port = 80;
+            }
+          ];
+          locations = {
+            "/api/" = {
+              proxyPass = "http://127.0.0.1:5023";
+              extraConfig = "proxy_set_header Host $host;";
+            };
+            # / (incl. the styled /signedout landing page) is served by the
+            # frontend, exactly like the container deployment.
+            "/" = {
+              proxyPass = "http://127.0.0.1:3000";
+              extraConfig = "proxy_set_header Host $host;";
             };
           };
         };
       };
+    };
 
     testScript = ''
       start_all()

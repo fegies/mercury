@@ -97,7 +97,6 @@
         # under tini as PID 1. See docs/DEPLOYMENT.md.
         container = pkgs.callPackage (import ./nix/container.nix) {
           inherit backend frontend;
-          nodejs = pkgs.nodejs_26;
         };
 
         # Mock OpenID Connect provider used by the integration tests.

@@ -12,7 +12,6 @@ using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Mvc.Controllers;
-using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 
 using System.Net;
@@ -27,6 +26,7 @@ var builder = WebApplication.CreateBuilder(args);
 var IsRealLaunch = Assembly.GetEntryAssembly() == Assembly.GetExecutingAssembly();
 
 var config = new BackendConfig();
+builder.Configuration.AddJsonFile("appsettings.local.json", optional: true);
 builder.Configuration.Bind(config);
 if (IsRealLaunch)
 {
@@ -84,7 +84,10 @@ builder.Services.AddAuthentication(options =>
     // invisible while the IdP's SSO session is alive.
     options.Cookie.HttpOnly = true;
     options.Cookie.SameSite = SameSiteMode.Lax;
-    options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+
+    if (!builder.Environment.IsDevelopment())
+        options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+
     options.ExpireTimeSpan = TimeSpan.FromHours(12);
     options.SlidingExpiration = false;
 })
@@ -99,6 +102,7 @@ builder.Services.AddAuthentication(options =>
     options.ClientSecret = oidcConf.ClientSecret;
     options.SignInScheme = CookieAuthenticationDefaults.AuthenticationScheme;
     options.ResponseType = OpenIdConnectResponseType.Code;
+    options.CallbackPath = "/api/signin-oidc";
 
     options.Scope.Clear();
     options.Scope.Add("openid");
@@ -177,11 +181,7 @@ builder.Services.AddAuthorizationBuilder()
     .SetFallbackPolicy(requireAuthPolicy);
 
 // Requests are throttled per authenticated user (a single ceiling across
-// every endpoint); anonymous traffic is throttled per client IP only where a
-// policy is attached — currently /api/login, the one anonymous entry point
-// worth flooding. The IP partition relies on the forwarded-headers
-// middleware having already replaced RemoteIpAddress with the real client
-// address (terminator → TrustedProxies chain; see docs/DEPLOYMENT.md).
+// every endpoint);
 builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
@@ -198,15 +198,6 @@ builder.Services.AddRateLimiter(options =>
             Window = TimeSpan.FromMinutes(1),
         });
     });
-
-    options.AddPolicy("login", context =>
-        RateLimitPartition.GetFixedWindowLimiter(
-            context.Connection.RemoteIpAddress?.ToString() ?? "unroutable",
-            _ => new FixedWindowRateLimiterOptions
-            {
-                PermitLimit = 30,
-                Window = TimeSpan.FromMinutes(1),
-            }));
 });
 
 var app = builder.Build();

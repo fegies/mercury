@@ -29,13 +29,19 @@ function build_authorize(event: RequestEvent): (requested_role: string) => Promi
 		user_prom ??= fetch_user();
 
 		const user = await user_prom.catch(() => undefined);
-		if (user != null && has_role(user, requested_role)) return user;
 
-		const login_url = new URL('/api/login', event.url);
-		// Path + query only: return_to must stay a local URL (the backend
-		// rejects absolute/foreign redirect targets).
-		login_url.searchParams.append('return_to', event.url.pathname + event.url.search);
-		throw redirect(303, login_url);
+		if (user == null) {
+			const login_url = new URL('/api/login', event.url);
+			// Path + query only: return_to must stay a local URL (the backend
+			// rejects absolute/foreign redirect targets).
+			login_url.searchParams.append('return_to', event.url.pathname + event.url.search);
+			throw redirect(303, login_url);
+		}
+
+		if (!has_role(user, requested_role))
+			throw (new Error('User does not have the role ' + requested_role));
+
+		return user;
 	};
 }
 

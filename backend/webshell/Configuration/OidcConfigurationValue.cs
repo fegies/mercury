@@ -34,7 +34,7 @@ public class OidcConfigurationValue
         /// <summary>
         /// This is a zitadel provider
         /// </summary>
-        Zitadel,
+        Zitadel = 1,
         /// <summary>
         /// This is microsoft entra id
         /// </summary>
@@ -49,7 +49,7 @@ public class OidcConfigurationValue
     /// What type of provider is this?
     /// </summary>
     [EnumDataType(typeof(ProviderTypeValue))]
-    public ProviderTypeValue ProviderType { get; init; } = ProviderTypeValue.Generic;
+    public ProviderTypeValue ProviderType { get; init; }
 
     internal void Validate()
     {

@@ -25,7 +25,7 @@ public sealed class LiveEventHub
 	/// thousands of open streams per identity are not — the SSE endpoint
 	/// surfaces the refusal as HTTP 429.
 	/// </summary>
-	private const int MaxConnectionsPerUser = 5;
+	private const int MaxConnectionsPerUser = 20;
 
 	private readonly Lock _registryLock = new();
 	private readonly Dictionary<Guid, Dictionary<long, Channel<LiveEvent>>> _byUser = [];

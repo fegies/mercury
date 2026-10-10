@@ -34,6 +34,11 @@ public class BackendConfig
     /// </summary>
     public ForwardedConfigurationValue ForwardedConfig { get; init; } = new();
 
+    /// <summary>
+    /// Validate the request domain lines up as protection against cors.
+    /// </summary>
+    public bool ValidateHost { get; init; } = true;
+
     internal void Validate()
     {
         var ctx = new ValidationContext(this);

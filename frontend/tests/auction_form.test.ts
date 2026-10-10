@@ -103,6 +103,20 @@ describe('parse_auction_form', () => {
 		expect(errors).toContain('auction-end must not be in the past');
 	});
 
+	it('allows a past closure time when opted in', () => {
+		const fd = form({
+			name: 'x',
+			description: 'x',
+			'min-price': '1',
+			'auction-end': '2000-01-01T10:00:00.000Z'
+		});
+
+		const { values, errors } = parse_auction_form(fd, { allow_past_closure: true });
+
+		expect(errors).toEqual([]);
+		expect(values?.closureTime).toBe('2000-01-01T10:00:00.000Z');
+	});
+
 	it('rejects an unparseable closure time', () => {
 		const fd = form({
 			name: 'x',

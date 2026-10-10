@@ -8,7 +8,14 @@ export type AuctionFormValues = {
 	isPublished: boolean;
 };
 
-export function parse_auction_form(formData: FormData): {
+export type ParseAuctionFormOptions = {
+	allow_past_closure?: boolean;
+};
+
+export function parse_auction_form(
+	formData: FormData,
+	options: ParseAuctionFormOptions = {}
+): {
 	values: AuctionFormValues | null;
 	errors: string[];
 } {
@@ -47,7 +54,7 @@ export function parse_auction_form(formData: FormData): {
 			return new Date().toISOString();
 		}
 
-		if (val <= Date.now()) {
+		if (!options.allow_past_closure && val <= Date.now()) {
 			errors.push(`${name} must not be in the past`);
 		}
 

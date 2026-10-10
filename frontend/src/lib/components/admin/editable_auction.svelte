@@ -6,25 +6,28 @@
 		submit_label = 'Create Auction',
 		action = '?',
 		min_closure = null,
-		extend_only = false
+		extend_only = false,
+		locked = false
 	}: {
 		model: AuctionSummary;
 		submit_label?: string;
 		action?: string;
 		min_closure?: string | null;
 		extend_only?: boolean;
+		locked?: boolean;
 	} = $props();
 </script>
 
 <form method="POST" {action} class="flex flex-col gap-4" enctype="multipart/form-data">
 	<label class="label">
 		<span class="label-text">Name</span>
-		<input class="input" type="text" name="name" value={model.title} />
+		<input class="input" type="text" name="name" value={model.title} readonly={locked} />
 	</label>
 
 	<label class="label">
 		<span class="label-text">Description</span>
-		<textarea class="textarea" name="description" value={model.description}></textarea>
+		<textarea class="textarea" name="description" value={model.description} readonly={locked}
+		></textarea>
 	</label>
 
 	<label class="label">
@@ -36,6 +39,7 @@
 			name="min-price"
 			min="0"
 			value={model.minimumPrice}
+			readonly={locked}
 		/>
 	</label>
 
@@ -48,6 +52,7 @@
 			name="auction-end"
 			min={new Date(min_closure ?? Date.now()).toISOString().slice(0, 16)}
 			value={new Date(model.closureTime).toISOString().slice(0, 16)}
+			readonly={locked}
 		/>
 		{#if extend_only}
 			<span class="text-surface-500 text-sm">
@@ -60,6 +65,12 @@
 		<input type="checkbox" class="checkbox" name="published" checked={model.isPublished} />
 		<span class="label-text">Published (visible to non-admin users)</span>
 	</label>
+
+	{#if locked}
+		<span class="text-surface-500 text-sm">
+			This auction is closed — only the published state can be changed.
+		</span>
+	{/if}
 
 	<input type="submit" class="btn preset-filled-primary-500 w-fit" value={submit_label} />
 </form>

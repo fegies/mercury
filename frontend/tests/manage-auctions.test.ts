@@ -113,6 +113,100 @@ describe('manage-auctions/[id] actions', () => {
 			expect(result).toEqual({ success: true });
 		});
 
+		it('unpublishes an open auction without extending', async () => {
+			const form = new FormData();
+			form.set('name', 'New Title');
+			form.set('description', 'New Desc');
+			form.set('min-price', '10');
+			form.set('auction-end', '2030-01-01T10:00:00.000Z');
+
+			const get = vi.fn().mockResolvedValue({
+				data: { closureTime: '2030-01-01T10:00:00.000Z', isClosed: false },
+				error: undefined
+			});
+			const extend = vi.fn();
+			const patch = vi
+				.fn()
+				.mockResolvedValue({ error: undefined, response: new Response('', { status: 204 }) });
+			make_client({
+				getApiAuctionsById: get,
+				postApiAuctionsByIdExtendClose: extend,
+				patchApiAuctionsById: patch
+			});
+
+			const result = await actions.update(event({ form }));
+
+			expect(extend).not.toHaveBeenCalled();
+			expect(patch).toHaveBeenCalledWith({
+				path: { id: 'auction-1' },
+				body: {
+					title: 'New Title',
+					description: 'New Desc',
+					minimumPrice: 10,
+					isPublished: false
+				}
+			});
+			expect(result).toEqual({ success: true });
+		});
+
+		it('patches only the publish state for a closed auction', async () => {
+			const form = new FormData();
+			form.set('name', 'Old Title');
+			form.set('description', 'Old Desc');
+			form.set('min-price', '10');
+			form.set('auction-end', '2000-01-01T10:00:00.000Z');
+
+			const get = vi.fn().mockResolvedValue({
+				data: { closureTime: '2000-01-01T10:00:00.000Z', isClosed: true },
+				error: undefined
+			});
+			const extend = vi.fn();
+			const patch = vi
+				.fn()
+				.mockResolvedValue({ error: undefined, response: new Response('', { status: 204 }) });
+			make_client({
+				getApiAuctionsById: get,
+				postApiAuctionsByIdExtendClose: extend,
+				patchApiAuctionsById: patch
+			});
+
+			const result = await actions.update(event({ form }));
+
+			expect(extend).not.toHaveBeenCalled();
+			expect(patch).toHaveBeenCalledWith({
+				path: { id: 'auction-1' },
+				body: { isPublished: false }
+			});
+			expect(result).toEqual({ success: true });
+		});
+
+		it('surfaces a plain-text API error message', async () => {
+			const form = new FormData();
+			form.set('name', 'New Title');
+			form.set('description', 'New Desc');
+			form.set('min-price', '10');
+			form.set('auction-end', '2030-01-01T10:00:00.000Z');
+
+			const get = vi.fn().mockResolvedValue({
+				data: { closureTime: '2030-01-01T10:00:00.000Z', isClosed: true },
+				error: undefined
+			});
+			const patch = vi.fn().mockResolvedValue({
+				error: 'Cannot update a closed auction.',
+				response: new Response('Cannot update a closed auction.', { status: 400 })
+			});
+			make_client({
+				getApiAuctionsById: get,
+				postApiAuctionsByIdExtendClose: vi.fn(),
+				patchApiAuctionsById: patch
+			});
+
+			const resultFail = failure(await actions.update(event({ form })));
+
+			expect(resultFail.status).toBe(400);
+			expect(resultFail.data.errors).toEqual(['Cannot update a closed auction.']);
+		});
+
 		it('returns field errors and does not call the API when the form is invalid', async () => {
 			const form = new FormData();
 			form.set('name', 'New Title');

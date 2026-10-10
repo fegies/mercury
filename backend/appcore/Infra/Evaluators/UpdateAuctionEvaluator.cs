@@ -14,7 +14,7 @@ public class UpdateAuctionEvaluator : IDecisionFunction<AuctionUpdated, bool>
 		if (state.AuctionId == Guid.Empty)
 			throw new InvariantViolation("Auction does not exist.");
 
-		if (state.IsClosed)
+		if (state.IsClosed && (input.Title is not null || input.Description is not null || input.MinimumPrice is not null))
 			throw new InvariantViolation("Cannot update a closed auction.");
 
 		if (input.Title is not null && string.IsNullOrEmpty(input.Title))

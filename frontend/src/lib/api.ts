@@ -30,8 +30,9 @@ export function build_browser_client(): BackendClient {
 // origin (the backend URL is configured directly via MERCURY_BACKEND_URL,
 // which keeps SSR calls off the public host), the browser's cookie is
 // attached explicitly; same-origin targets (the fallback when unset) keep
-// SvelteKit's own cookie forwarding. The SSR guard keeps `process` out of
-// the browser bundle.
+// SvelteKit's own cookie forwarding. The client's X-Forwarded-For chain is
+// preserved so the backend sees the real client address. The SSR guard
+// keeps `process` out of the browser bundle.
 function backend_base_url(event: RequestEvent): string {
 	if (import.meta.env.SSR) {
 		const configured = process.env.MERCURY_BACKEND_URL?.trim();
@@ -55,6 +56,13 @@ function backend_request(
 	if (new URL(request.url).origin !== event.url.origin) {
 		const cookie = event.request.headers.get('cookie');
 		if (cookie && !request.headers.has('cookie')) request.headers.set('cookie', cookie);
+	}
+
+	// The SSR connection is a trusted loopback proxy from the backend's point
+	// of view, so it consumes this chain and learns the real client IP.
+	const forwarded_for = event.request.headers.get('x-forwarded-for');
+	if (forwarded_for && !request.headers.has('x-forwarded-for')) {
+		request.headers.set('x-forwarded-for', forwarded_for);
 	}
 
 	return request;

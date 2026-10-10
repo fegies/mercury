@@ -168,6 +168,9 @@ in
           PORT = "3000";
           ORIGIN = "http://localhost";
           NODE_ENV = "production";
+          # Production wiring: SSR API calls target the backend directly
+          # instead of hairpinning through the public origin.
+          MERCURY_BACKEND_URL = "http://127.0.0.1:5023";
         };
         serviceConfig = {
           ExecStart = "${pkgs.nodejs_26}/bin/node ${frontend}/build/index.js";
@@ -186,6 +189,17 @@ in
               port = 80;
             }
           ];
+          # The same baseline the documented TLS terminator applies, minus the
+          # script/style policies: the app itself sends those as a per-request
+          # nonce CSP (SvelteKit kit.csp) and browsers intersect every CSP
+          # header — a nonce-less script-src here would block the app's inline
+          # bootstrap. Driving real pages through this proves both halves.
+          extraConfig = ''
+            add_header X-Content-Type-Options "nosniff" always;
+            add_header X-Frame-Options "DENY" always;
+            add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+            add_header Content-Security-Policy "style-src 'self'; img-src 'self' data: https:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'" always;
+          '';
           locations = {
             "/api/" = {
               proxyPass = "http://127.0.0.1:5023";

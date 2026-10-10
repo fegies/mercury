@@ -67,6 +67,10 @@ public class LiveController(LiveEventHub hub, IHostApplicationLifetime _host_lif
                 }
             }
         }
+        catch (OperationCanceledException)
+        {
+            // just let the stream finish   
+        }
         finally
         {
             connection.Dispose();

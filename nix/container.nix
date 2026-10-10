@@ -22,7 +22,8 @@
 #   - TLS is terminated upstream; the container speaks plain HTTP on :8080
 #     and forwards X-Forwarded-* metadata at every level (nginx ->
 #     node/frontend and nginx -> backend). The upstream proxy MUST set
-#     X-Forwarded-Proto and Host.
+#     X-Forwarded-Proto, Host and X-Forwarded-For (from the connection
+#     peer, discarding client-supplied values).
 #   - If any of the three services dies, the entrypoint stops the remaining
 #     ones and exits, letting the container restart as a whole (use a
 #     restart policy, e.g. podman run --restart=on-failure).
@@ -87,7 +88,12 @@
 
         proxy_http_version 1.1;
         proxy_set_header Host $host;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        # X-Forwarded-For is passed through untouched: the TLS terminator
+        # owns this header (it sets it from the connection peer and discards
+        # whatever the client sent — see docs/DEPLOYMENT.md). Appending here
+        # would only force TrustedProxies entries for the internal hops.
+        # When the incoming value is empty, nginx drops the header entirely.
+        proxy_set_header X-Forwarded-For $http_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $forwarded_scheme;
         proxy_set_header X-Forwarded-Host $host;
 
@@ -229,6 +235,9 @@ in
         "PORT=3000"
         "PROTOCOL_HEADER=x-forwarded-proto"
         "HOST_HEADER=x-forwarded-host"
+        # SSR API calls target the backend directly over the internal
+        # loopback, so the frontend never dials the public origin.
+        "MERCURY_BACKEND_URL=http://127.0.0.1:5023"
         "ASPNETCORE_ENVIRONMENT=Production"
         "ASPNETCORE_URLS=http://127.0.0.1:5023"
         "ImageStorage__BasePath=${stateDir}/data/images"

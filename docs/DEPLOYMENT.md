@@ -33,9 +33,11 @@ environment variables.
   capabilities. The container listens on the unprivileged port **8080**;
   publish it with `-p 8080:8080` (or `-p 80:8080` if the host side should be
   80).
-- The upstream terminator **must** set `X-Forwarded-Proto: https` and the
-  public `Host`; the container propagates forwarded headers on every level
-  (see [TLS & proxying](#tls--proxying)).
+- The upstream terminator **must** set `X-Forwarded-Proto: https`, the
+  public `Host` and `X-Forwarded-For` (from the connection peer, discarding
+  client-supplied values); setting `X-Forwarded-Host` as well keeps the
+  contract self-contained at the boundary. The container propagates
+  forwarded headers on every level (see [TLS & proxying](#tls--proxying)).
 - If one of the three services crashes, the entrypoint stops the remaining
   ones and the container exits — run it with a **restart policy**
   (`--restart=on-failure`, compose `restart: unless-stopped`, k8s default)
@@ -206,6 +208,7 @@ users), so users who are actively working rarely notice it. Consequences:
 | `ASPNETCORE_ENVIRONMENT`              | .NET environment (keep `Production` in deployment)   | `Production` (set by image)|
 | `ForwardedConfig__TrustedProxies__0…` | Extra proxy IPs (one per index) whose `X-Forwarded-*` headers the backend trusts beyond the container's internal proxy | (loopback only) |
 | `ImageStorage__BasePath`              | Image storage directory (advanced; see volume)       | `/var/lib/mercury/data/images` (set by image) |
+| `MERCURY_BACKEND_URL`                 | Where the frontend's SSR code reaches the backend API. The image sets it to the container-internal backend, so SSR never dials the public origin | `http://127.0.0.1:5023` (set by image) |
 
 Example — TLS terminator running on a fixed address in front of the
 container:
@@ -259,19 +262,30 @@ put a TLS terminator in front of it (your ingress, load balancer, or reverse
 proxy). The contract:
 
 1. **TLS terminator → container**: must forward to the container's port 8080
-   and set `X-Forwarded-Proto: https` (and the public `Host`). Standard
-   behaviour of nginx/traefik/caddy/HAProxy deployments.
-2. **Container nginx**: appends to `X-Forwarded-For`
-   (`$proxy_add_x_forwarded_for`), passes `X-Forwarded-Proto` through
-   (falling back to `http` when absent), and sets `X-Forwarded-Host`.
+   and set `X-Forwarded-Proto: https`, the public `Host` (with a matching
+   `X-Forwarded-Host`), and `X-Forwarded-For` **from the connection peer** —
+   discarding whatever the client sent. Overwriting at the boundary is what
+   keeps clients from spoofing their address through the chain, which passes
+   `X-Forwarded-For` through untouched. Standard behaviour of
+   nginx/traefik/caddy/HAProxy deployments.
+2. **Container nginx**: passes `X-Forwarded-For` through untouched (the
+   terminator owns it), passes `X-Forwarded-Proto` through (falling back to
+   `http` when absent), and sets `X-Forwarded-Host`.
 3. **SvelteKit frontend**: derives the request origin dynamically from
    `X-Forwarded-Proto`/`X-Forwarded-Host` (`PROTOCOL_HEADER`/`HOST_HEADER`),
-   so SSR URLs and redirects are correct on any public host.
+   so SSR URLs and redirects are correct on any public host. Its server-side
+   API calls go straight to the backend over the container-internal loopback
+   (`MERCURY_BACKEND_URL`, set by the image), so the container does **not**
+   need to be able to reach its own public hostname, and they preserve the
+   client's `X-Forwarded-For` so the backend sees the real client address.
 4. **ASP.NET backend**: `ForwardedHeadersMiddleware` re-derives scheme, host
    and client IP, keeping OIDC redirect URIs and cookies correct. The
-   container's nginx (loopback) is trusted out of the box; add upstream
-   proxies via `ForwardedConfig__TrustedProxies__N` if you route through more
-   hops.
+   container's nginx (loopback) is trusted out of the box. With the
+   pass-through contract above, no further configuration is needed for a
+   single TLS terminator; `ForwardedConfig__TrustedProxies__N` is only
+   required when an upstream hop *appends* its own address to
+   `X-Forwarded-For` (e.g. a managed load balancer you cannot configure to
+   strip client-supplied values).
 
 Do **not** send `X-Forwarded-*` headers from untrusted clients directly to
 the container port — only the TLS terminator should reach it.
@@ -292,9 +306,122 @@ strict-origin-when-cross-origin`, and `X-Frame-Options: DENY`. What it
 deliberately does **not** set is `Strict-Transport-Security` (HSTS): the
 container speaks plain HTTP, so HSTS is only meaningful over TLS and belongs
 at the terminator. Send e.g. `Strict-Transport-Security:
-max-age=31536000; includeSubDomains` from your ingress, and add a
-`Content-Security-Policy` there if you want one — the container will pass it
+max-age=31536000; includeSubDomains` from your ingress — the complete
+example below sets HSTS and the non-script `Content-Security-Policy`
+directives. Script and style protection is sent by the **app itself** as a
+per-request nonce CSP (`kit.csp` in `frontend/svelte.config.js`), because
+SvelteKit's production bootstrap is an inline script: a static
+`script-src` at the terminator would block it, and browsers enforce every
+CSP header as an intersection. The integration test runs the real browser
+journey behind exactly these headers. The container will pass your headers
 through untouched.
+
+### Example TLS terminator (nginx)
+
+Copy-paste starting point for a deployment where this proxy terminates TLS
+in front of the container. Adjust `server_name`, the certificate paths and
+the upstream address; everything else can stay as-is.
+
+```nginx
+# /etc/nginx/conf.d/mercury.conf — TLS terminator for Project Mercury.
+upstream mercury {
+    # The container is published as e.g. `podman run -p 8080:8080`.
+    # Point this at the published port on the same host, or at the
+    # container host's address.
+    server 127.0.0.1:8080;
+    keepalive 16;
+}
+
+# Redirect plain-HTTP traffic to HTTPS; keep the ACME challenge local.
+server {
+    listen 80;
+    listen [::]:80;
+    server_name auctions.example.org;
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/acme;
+    }
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
+
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    # nginx >= 1.25.1; on older releases use: listen 443 ssl http2;
+    http2 on;
+    server_name auctions.example.org;
+
+    # ---- TLS ------------------------------------------------------------
+    ssl_certificate     /etc/letsencrypt/live/auctions.example.org/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/auctions.example.org/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_prefer_server_ciphers off;
+    ssl_session_timeout 1d;
+    ssl_session_cache shared:mercury_tls:10m;
+    ssl_session_tickets off;
+
+    # ---- Security headers -------------------------------------------------
+    # HSTS is cached aggressively by browsers: start with a small max-age
+    # (e.g. 300) if reverting to HTTP must stay possible, then raise it.
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-Frame-Options "DENY" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
+    # Everything except script/style policies: the app itself sends those as
+    # a per-request nonce CSP (SvelteKit kit.csp — its production bootstrap is
+    # an inline script). Browsers intersect ALL CSP headers, so do NOT add
+    # script-src, style-src or default-src here: a nonce-less script-src
+    # would block the app's bootstrap, and only the app knows the nonces.
+    add_header Content-Security-Policy "img-src 'self' data: https:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'" always;
+
+    server_tokens off;
+
+    # ---- Uploads ------------------------------------------------------------
+    # Image uploads traverse this proxy as well; keep in sync with the
+    # container (nginx 30m, SvelteKit BODY_SIZE_LIMIT=30M, ASP.NET 30 MB).
+    client_max_body_size 30m;
+
+    # ---- Proxying ------------------------------------------------------------
+    location / {
+        proxy_pass http://mercury;
+        proxy_http_version 1.1;
+        proxy_set_header Connection "";
+
+        # Forwarded-header contract: the container must learn the *public*
+        # scheme, host and client address. These directives overwrite
+        # anything a client sent — X-Forwarded-For is set from the
+        # connection peer ($remote_addr), discarding any client-supplied
+        # value, so no forged X-Forwarded-* header reaches the container.
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_set_header X-Forwarded-Host $host;
+        proxy_set_header X-Forwarded-For $remote_addr;
+
+        # Server-sent events (live bid notifications) are long-lived and
+        # unbuffered; the backend also sends X-Accel-Buffering: no.
+        proxy_read_timeout 1h;
+        proxy_buffering off;
+    }
+
+    access_log /var/log/nginx/mercury.access.log;
+    error_log  /var/log/nginx/mercury.error.log warn;
+}
+```
+
+Notes:
+
+- Keep the container's port 8080 unreachable from untrusted networks
+  (firewall / dedicated podman network): this proxy is the only intended
+  client, and the forwarded-header contract above is what makes spoofed
+  `X-Forwarded-*` headers harmless.
+- A deployment on a non-default port (e.g. `:8443`) breaks SvelteKit's
+  form-POST origin check — publish on 443, or set
+  `ORIGIN=https://<host>:<port>` in the container environment.
+- The CSP's `img-src https:` allows IdP-hosted profile pictures; tighten it
+  to your identity provider's host if you prefer.
 
 ### Read-only root filesystem
 

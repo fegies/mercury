@@ -103,7 +103,7 @@ Container smoke test: `nix build .#tests.<system>.container`. Configuration
 - Auto-generated from OpenAPI spec via `@hey-api/openapi-ts`
 - Source: `backend/openapi/backend.json` → output: `frontend/src/lib/client/`
 - After backend controller changes: export OpenAPI spec, then run `npm run openapi-ts` in frontend
-- Client factory: `build_client(event)` in `src/lib/api.ts`
+- Client factory: `build_client(event)` in `src/lib/api.ts` — it resolves the backend URL (`MERCURY_BACKEND_URL`, falling back to the public origin) and attaches the request's cookie header automatically; never set those up manually
 - **No duplicate frontend types.** Use the generated `AuctionSummary`/request types from `src/lib/client/types.gen.ts` directly (re-exported via `src/lib/types/auction.ts` if convenient). To keep generated types "nice" (required vs optional fields), mark always-present C# record properties as `required` so the OpenAPI `required` array is populated.
 - Auction creation (`CreateAuction`) takes a JSON `CreateAuctionRequest` without images; upload images afterwards via `UploadImages` (`postApiAuctionsByIdImages`), which is `multipart/form-data` — array-of-file bodies must use the generated `Files` property name.
 

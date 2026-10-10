@@ -33,9 +33,11 @@ environment variables.
   capabilities. The container listens on the unprivileged port **8080**;
   publish it with `-p 8080:8080` (or `-p 80:8080` if the host side should be
   80).
-- The upstream terminator **must** set `X-Forwarded-Proto: https` and the
-  public `Host`; the container propagates forwarded headers on every level
-  (see [TLS & proxying](#tls--proxying)).
+- The upstream terminator **must** set `X-Forwarded-Proto: https`, the
+  public `Host` and `X-Forwarded-For` (from the connection peer, discarding
+  client-supplied values); setting `X-Forwarded-Host` as well keeps the
+  contract self-contained at the boundary. The container propagates
+  forwarded headers on every level (see [TLS & proxying](#tls--proxying)).
 - If one of the three services crashes, the entrypoint stops the remaining
   ones and the container exits — run it with a **restart policy**
   (`--restart=on-failure`, compose `restart: unless-stopped`, k8s default)
@@ -260,12 +262,12 @@ put a TLS terminator in front of it (your ingress, load balancer, or reverse
 proxy). The contract:
 
 1. **TLS terminator → container**: must forward to the container's port 8080
-   and set `X-Forwarded-Proto: https`, the public `Host`, and
-   `X-Forwarded-For` **from the connection peer** — discarding any
-   `X-Forwarded-For` value the client sent. This strip-and-set is required:
-   the chain below passes the header through untouched, so a terminator that
-   forwarded client-supplied values would let clients spoof their address.
-   Standard behaviour of nginx/traefik/caddy/HAProxy deployments.
+   and set `X-Forwarded-Proto: https`, the public `Host` (with a matching
+   `X-Forwarded-Host`), and `X-Forwarded-For` **from the connection peer** —
+   discarding whatever the client sent. Overwriting at the boundary is what
+   keeps clients from spoofing their address through the chain, which passes
+   `X-Forwarded-For` through untouched. Standard behaviour of
+   nginx/traefik/caddy/HAProxy deployments.
 2. **Container nginx**: passes `X-Forwarded-For` through untouched (the
    terminator owns it), passes `X-Forwarded-Proto` through (falling back to
    `http` when absent), and sets `X-Forwarded-Host`.
@@ -395,6 +397,7 @@ server {
         # value, so no forged X-Forwarded-* header reaches the container.
         proxy_set_header Host $host;
         proxy_set_header X-Forwarded-Proto https;
+        proxy_set_header X-Forwarded-Host $host;
         proxy_set_header X-Forwarded-For $remote_addr;
 
         # Server-sent events (live bid notifications) are long-lived and

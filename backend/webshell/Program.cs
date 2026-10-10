@@ -225,6 +225,7 @@ app.Use(async (ctx, next) =>
         ctx.Response.StatusCode = e.StatusCode;
         if (e.Message != null)
         {
+            ctx.Response.ContentType = "text/plain; charset=utf-8";
             Encoding.UTF8.GetBytes(e.Message, ctx.Response.BodyWriter);
             await ctx.Response.BodyWriter.FlushAsync();
         }
@@ -232,6 +233,7 @@ app.Use(async (ctx, next) =>
     catch (InvariantViolation e)
     {
         ctx.Response.StatusCode = StatusCodes.Status400BadRequest;
+        ctx.Response.ContentType = "text/plain; charset=utf-8";
         Encoding.UTF8.GetBytes(e.Message, ctx.Response.BodyWriter);
         await ctx.Response.BodyWriter.FlushAsync();
     }

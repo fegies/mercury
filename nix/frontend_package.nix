@@ -1,16 +1,17 @@
-{ lib
-, sources
-, buildNpmPackage
+{
+  lib,
+  sources,
+  buildNpmPackage,
 }:
-buildNpmPackage rec {
+buildNpmPackage {
   pname = "mercury-frontend";
   version = "0.0.1";
 
   src = sources;
 
-  npmDepsHash = "sha256-n6h7IMc34W6v7ZQ9Ibyr6tkXKSdUElMWebtmVgM3wKs=";
+  npmDepsHash = "sha256-3I1HQHDzHYz+Rl/PBmaSYeS1Oi691Xgce5A2RCFaQFM=";
 
-  npmPackFlags = [ "--ignore-scripts" ];
+  npmPackFlags = ["--ignore-scripts"];
 
   # The default install phase only copies what `npm pack` would publish, which
   # excludes the gitignored `build/` output of `vite build` (adapter-node). We

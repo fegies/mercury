@@ -53,9 +53,6 @@
 		"vitest": "^4.1.11"
 	},
 	"overrides": {
-		"@hey-api/json-schema-ref-parser": {
-			"js-yaml": "^4.3.2"
-		},
 		"postcss-selector-parser": "^7.1.6"
 	}
 }

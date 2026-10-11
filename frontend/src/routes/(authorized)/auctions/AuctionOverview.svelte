@@ -1,6 +1,6 @@
 <script lang="ts">
-	import DateCountdownBadge from '$lib/components/common/DateCountdownBadge.svelte';
-	import type { AuctionSummary } from '$lib/types/auction.js';
+	import DateCountdownBadge from '#lib/components/common/DateCountdownBadge.svelte';
+	import type { AuctionSummary } from '#lib/types/auction.js';
 
 	import IconImage from '@lucide/svelte/icons/image-off';
 

@@ -1,9 +1,10 @@
 <script lang="ts">
-	import UserAvatar from '$lib/components/common/user_avatar.svelte';
-	import { LiveStream, provide_live_stream } from '$lib/live';
+	import UserAvatar from '#lib/components/common/user_avatar.svelte';
+	import { LiveStream, provide_live_stream } from '#lib/live.js';
 	import type { LayoutProps } from './$types';
 	import { AppBar, createToaster, Toaster } from '@skeletonlabs/skeleton-svelte';
 	import { onDestroy } from 'svelte';
+	import { resolve } from '$app/paths';
 
 	let { children, data }: LayoutProps = $props();
 
@@ -48,12 +49,12 @@
 <AppBar>
 	{#snippet lead()}
 		<div class="flex flex-wrap items-center gap-3 sm:gap-10">
-			<a href="/" class="card p-3 sm:p-5">
+			<a href={resolve('')} class="card p-3 sm:p-5">
 				<strong class="text-xl uppercase">{data.branding}</strong>
 			</a>
-			<a href="/auctions" class="card p-3 sm:p-5">Auctions</a>
+			<a href={resolve('auctions')} class="card p-3 sm:p-5">Auctions</a>
 			{#if data.me}
-				<a href="/manage-auctions" class="card p-3 sm:p-5">Manage Auctions</a>
+				<a href={resolve('manage-auctions')} class="card p-3 sm:p-5">Manage Auctions</a>
 			{/if}
 		</div>
 	{/snippet}

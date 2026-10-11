@@ -1,6 +1,6 @@
 <script lang="ts">
-	import EditableAuction from '$lib/components/admin/editable_auction.svelte';
-	import CameraCapture from '$lib/components/admin/camera_capture.svelte';
+	import EditableAuction from '#lib/components/admin/editable_auction.svelte';
+	import CameraCapture from '#lib/components/admin/camera_capture.svelte';
 	import { FileUpload } from '@skeletonlabs/skeleton-svelte';
 	import type { ActionData, PageData } from './$types';
 

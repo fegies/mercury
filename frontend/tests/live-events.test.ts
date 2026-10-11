@@ -1,16 +1,16 @@
 import { describe, expect, it, vi, beforeEach, type Mock } from 'vitest';
 
-vi.mock('$lib/api', () => ({
+vi.mock('#lib/api.js', () => ({
 	build_browser_client: vi.fn()
 }));
 
-vi.mock('$app/environment', () => ({
+vi.mock('$app/env', () => ({
 	browser: true
 }));
 
-import { build_browser_client } from '$lib/api';
-import type { LiveEvent } from '$lib/client/types.gen';
-import { LiveStream } from '$lib/live';
+import { build_browser_client } from '#lib/api.js';
+import type { LiveEvent } from '#lib/client/types.gen.js';
+import { LiveStream } from '#lib/live.js';
 
 function notification(type: 'Outbid' | 'Won' | 'Cancelled', auctionId = 'auction-1'): LiveEvent {
 	return { kind: 'Notification', type, auctionId, title: 'Test Auction', price: 12.5 };

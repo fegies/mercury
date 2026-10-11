@@ -1,6 +1,6 @@
 import { error, fail } from '@sveltejs/kit';
-import { build_client } from '$lib/api';
-import { parse_auction_form, selected_files, to_auction } from '$lib/auction_form';
+import { build_client } from '#lib/api.js';
+import { parse_auction_form, selected_files, to_auction } from '#lib/auction_form.js';
 import type { Actions, PageServerLoad, RequestEvent } from './$types';
 
 function api_error_message(apiError: unknown): string | null {

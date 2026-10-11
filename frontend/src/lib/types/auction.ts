@@ -1,6 +1,6 @@
-import type { AuctionSummary } from '$lib/client/types.gen';
+import type { AuctionSummary } from '#lib/client/types.gen.js';
 
-export type { AuctionSummary } from '$lib/client/types.gen';
+export type { AuctionSummary } from '#lib/client/types.gen.js';
 
 export function default_auction(): AuctionSummary {
 	return {

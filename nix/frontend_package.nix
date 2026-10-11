@@ -9,7 +9,7 @@ buildNpmPackage {
 
   src = sources;
 
-  npmDepsHash = "sha256-3I1HQHDzHYz+Rl/PBmaSYeS1Oi691Xgce5A2RCFaQFM=";
+  npmDepsHash = "sha256-9/q/gbgecszA3zXRCQlnjP8SgzQP0mTz5dtkOOw9QjQ=";
 
   npmPackFlags = ["--ignore-scripts"];
 

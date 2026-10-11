@@ -1,6 +1,7 @@
-import { build_client } from '$lib/api';
-import type { Me } from '$lib/client/types.gen';
-import { redirect, type Handle, type RequestEvent } from '@sveltejs/kit';
+import { redirect, type RequestEvent } from '@sveltejs/kit';
+import type { Handle } from '@sveltejs/kit/hooks';
+import { build_client } from '#lib/api.js';
+import type { Me } from '#lib/client/types.gen.js';
 
 export const handle: Handle = async ({ event, resolve }) => {
 	event.locals.authorize = build_authorize(event);
@@ -39,7 +40,7 @@ function build_authorize(event: RequestEvent): (requested_role: string) => Promi
 		}
 
 		if (!has_role(user, requested_role))
-			throw (new Error('User does not have the role ' + requested_role));
+			throw new Error('User does not have the role ' + requested_role);
 
 		return user;
 	};

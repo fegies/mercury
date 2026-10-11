@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { AuctionSummary } from '$lib/types/auction';
+	import type { AuctionSummary } from '#lib/types/auction.js';
 
 	let {
 		model = $bindable(),

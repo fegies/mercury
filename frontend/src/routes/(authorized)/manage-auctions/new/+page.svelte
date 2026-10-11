@@ -1,6 +1,6 @@
 <script lang="ts">
-	import EditableAuction from '$lib/components/admin/editable_auction.svelte';
-	import { default_auction } from '$lib/types/auction';
+	import EditableAuction from '#lib/components/admin/editable_auction.svelte';
+	import { default_auction } from '#lib/types/auction.js';
 	import type { ActionData } from './$types';
 
 	let { form }: { form: ActionData } = $props();

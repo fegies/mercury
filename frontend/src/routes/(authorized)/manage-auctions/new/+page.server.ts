@@ -1,7 +1,7 @@
 import { fail, redirect } from '@sveltejs/kit';
-import { parse_auction_form, to_auction } from '$lib/auction_form';
-import { build_client } from '$lib/api';
-import type { AuctionSummary } from '$lib/types/auction.js';
+import { parse_auction_form, to_auction } from '#lib/auction_form.js';
+import { build_client } from '#lib/api.js';
+import type { AuctionSummary } from '#lib/types/auction.js';
 import type { Actions, RequestEvent } from './$types';
 
 export const actions = {

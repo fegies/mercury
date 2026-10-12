@@ -1,6 +1,6 @@
 // See https://svelte.dev/docs/kit/types#app.d.ts
 
-import type { Me } from '$lib/client/types.gen';
+import type { Me } from '#lib/client/types.gen.js';
 
 // for information about these interfaces
 declare global {

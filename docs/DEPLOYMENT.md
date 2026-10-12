@@ -294,9 +294,10 @@ the container port — only the TLS terminator should reach it.
 form-POST origins against the request origin it derives from the forwarded
 headers (without a port); a browser always includes non-default ports in
 its `Origin` header, so a deployment on e.g. `:8443` would have every form
-POST rejected. If a non-443 port is unavoidable, set
-`ORIGIN=https://<host>:<port>` in the container environment so the
-frontend compares against the full public origin instead.
+POST rejected. If a non-443 port is unavoidable, forward `X-Forwarded-Port`
+from the TLS terminator through the container's nginx and set
+`PORT_HEADER=x-forwarded-port` in the container environment so the frontend
+compares against the full public origin instead.
 
 ### Security headers
 
@@ -309,7 +310,8 @@ at the terminator. Send e.g. `Strict-Transport-Security:
 max-age=31536000; includeSubDomains` from your ingress — the complete
 example below sets HSTS and the non-script `Content-Security-Policy`
 directives. Script and style protection is sent by the **app itself** as a
-per-request nonce CSP (`kit.csp` in `frontend/svelte.config.js`), because
+per-request nonce CSP (`csp` in the `sveltekit()` plugin options in
+`frontend/vite.config.ts`), because
 SvelteKit's production bootstrap is an inline script: a static
 `script-src` at the terminator would block it, and browsers enforce every
 CSP header as an intersection. The integration test runs the real browser
@@ -418,8 +420,9 @@ Notes:
   client, and the forwarded-header contract above is what makes spoofed
   `X-Forwarded-*` headers harmless.
 - A deployment on a non-default port (e.g. `:8443`) breaks SvelteKit's
-  form-POST origin check — publish on 443, or set
-  `ORIGIN=https://<host>:<port>` in the container environment.
+  form-POST origin check — publish on 443, or forward `X-Forwarded-Port`
+  from the TLS terminator and set `PORT_HEADER=x-forwarded-port` in the
+  container environment.
 - The CSP's `img-src https:` allows IdP-hosted profile pictures; tighten it
   to your identity provider's host if you prefer.
 

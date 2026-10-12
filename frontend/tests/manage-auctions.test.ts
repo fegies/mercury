@@ -1,10 +1,10 @@
 import { describe, expect, it, vi, beforeEach, type Mock } from 'vitest';
 
-vi.mock('$lib/api', () => ({
+vi.mock('#lib/api.js', () => ({
 	build_client: vi.fn()
 }));
 
-import { build_client } from '$lib/api';
+import { build_client } from '#lib/api.js';
 import type { ActionFailure } from '@sveltejs/kit';
 import { actions } from '../src/routes/(authorized)/manage-auctions/[id]/+page.server';
 

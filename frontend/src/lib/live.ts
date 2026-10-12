@@ -1,7 +1,7 @@
-import { browser } from '$app/environment';
+import { browser } from '$app/env';
 import { getContext, setContext } from 'svelte';
-import { build_browser_client } from '$lib/api';
-import type { LiveEvent } from '$lib/client/types.gen';
+import { build_browser_client } from '#lib/api.js';
+import type { LiveEvent } from '#lib/client/types.gen.js';
 
 export type LiveNotification = LiveEvent & { kind: 'Notification' };
 export type LiveAuctionUpdate = LiveEvent & { kind: 'AuctionUpdated' };

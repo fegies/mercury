@@ -1,6 +1,6 @@
 import { error, fail } from '@sveltejs/kit';
-import { build_client } from '$lib/api';
-import { parse_bid_form } from '$lib/bid_form';
+import { build_client } from '#lib/api.js';
+import { parse_bid_form } from '#lib/bid_form.js';
 import type { Actions, PageServerLoad, RequestEvent } from './$types';
 
 export const load: PageServerLoad = async (event) => {

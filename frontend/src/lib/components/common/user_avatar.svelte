@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { UserInfo } from '$lib/client/types.gen';
+	import type { UserInfo } from '#lib/client/types.gen.js';
 	import { Avatar } from '@skeletonlabs/skeleton-svelte';
 	import type { Snippet } from 'svelte';
 

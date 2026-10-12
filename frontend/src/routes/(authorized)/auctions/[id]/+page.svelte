@@ -1,10 +1,10 @@
 <script lang="ts">
-	import Imageset from '$lib/components/common/imageset.svelte';
-	import { build_browser_client } from '$lib/api';
-	import { use_live_stream } from '$lib/live';
-	import { BidRecency } from '$lib/bid_recency.svelte.js';
+	import Imageset from '#lib/components/common/imageset.svelte';
+	import { build_browser_client } from '#lib/api.js';
+	import { use_live_stream } from '#lib/live.js';
+	import { BidRecency } from '#lib/bid_recency.svelte.js';
 	import { onMount } from 'svelte';
-	import type { AuctionSummary } from '$lib/types/auction.js';
+	import type { AuctionSummary } from '#lib/types/auction.js';
 	import type { ActionData, PageData } from './$types';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();

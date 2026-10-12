@@ -1,9 +1,11 @@
 <script lang="ts">
 	import AuctionOverview from './AuctionOverview.svelte';
-	import { build_browser_client } from '$lib/api';
-	import { use_live_stream } from '$lib/live';
+	import { build_browser_client } from '#lib/api.js';
+	import { use_live_stream } from '#lib/live.js';
 	import { onMount } from 'svelte';
-	import type { AuctionSummary } from '$lib/types/auction.js';
+	import { SvelteMap } from 'svelte/reactivity';
+	import { resolve } from '$app/paths';
+	import type { AuctionSummary } from '#lib/types/auction.js';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -13,7 +15,7 @@
 	// Refreshed summaries patch the SSR-loaded list per auction: a ping
 	// refetches only the auction that changed, and the overlay is keyed so
 	// rows update without touching the rest of the list.
-	let refreshed = $state(new Map<string, AuctionSummary>());
+	let refreshed = new SvelteMap<string, AuctionSummary>();
 	let auctions = $derived(data.auctions.map((auction) => refreshed.get(auction.id) ?? auction));
 
 	onMount(() => {
@@ -29,7 +31,6 @@
 		const { data: summary, error: apiError } = await client.getApiAuctionsById({ path: { id } });
 		if (!apiError && summary) {
 			refreshed.set(id, summary);
-			refreshed = new Map(refreshed);
 		}
 	}
 </script>
@@ -38,7 +39,7 @@
 
 <div class="flex flex-col gap-5">
 	{#each auctions as auction (auction.id)}
-		<a href="/auctions/{auction.id}">
+		<a href={resolve(`auctions/${auction.id}`)}>
 			<div class="card flex flex-col gap-5 p-5 sm:flex-row sm:gap-10">
 				<AuctionOverview {auction}></AuctionOverview>
 			</div>

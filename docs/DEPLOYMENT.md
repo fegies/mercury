@@ -16,7 +16,7 @@ environment variables.
  client ──▶ TLS terminator / ingress ══ plain HTTP ══▶ nginx :8080           │
             │ (must set X-Forwarded-Proto: https and Host)  │                 │
             │                          ┌────────────────────┴───────────────┐  │
-            │   / (UI, static assets)  │            /api/, /signin-oidc      │  │
+            │   / (UI, static assets)  │          /api/ (incl. signin-oidc)  │  │
             │                          ▼                                     ▼  │
             │              SvelteKit node server                 ASP.NET Core │
             │              (127.0.0.1:3000)                      (127.0.0.1:5023)│
@@ -99,6 +99,7 @@ podman run -d --restart=on-failure --name mercury \
   -e 'OidcConfig__AuthorityUrl=https://sso.example.org' \
   -e 'OidcConfig__ClientId=mercury' \
   -e 'OidcConfig__ClientSecret=CHANGE_ME' \
+  -e 'OidcConfig__ProviderType=Zitadel|Entra|Generic' \
   mercury:0.0.1
 ```
 
@@ -172,7 +173,8 @@ Notes:
 | `EntraConfig__AdminGroupIds` | JSON array of Entra group ids granting admin (Entra only) | `[]` |
 
 The redirect URI registered with the provider must be
-`https://<public-host>/signin-oidc`. Register
+`https://<public-host>/api/signin-oidc` — the backend's OIDC callback path,
+which the container routes to the backend via its `/api/` location. Register
 `https://<public-host>/signedout` as a **post-logout redirect URI** as
 well: the UI's "sign out of SSO" action performs RP-initiated logout
 against that address (a plain logout only clears the local cookie).
@@ -222,12 +224,12 @@ One IP per indexed variable — a comma-separated single value (e.g.
 `ForwardedConfig__TrustedProxies=10.0.0.5,10.0.0.6`) is not supported and
 would silently bind to an empty list.
 
-**Rate limiting depends on this list.** Authenticated requests are
-throttled per user; the one anonymous entry point (`/api/login`) is
-throttled **per client IP**. Unless the TLS terminator is listed in
-`ForwardedConfig__TrustedProxies__N`, the backend sees the terminator's IP
-as the client address and all anonymous users share a single throttle
-bucket — add your terminator's IP(s) so per-client limiting works.
+**Rate limiting does not depend on this list.** Authenticated requests are
+throttled per user (a fixed-window budget keyed on the user's id, shared
+across all endpoints); anonymous requests are not throttled.
+`ForwardedConfig__TrustedProxies__N` only restores the real client IP (plus
+scheme/host) for redirects, OIDC and logging — the throttle buckets are
+keyed on the authenticated user, not on the client address.
 
 ## Data volume
 
@@ -373,8 +375,9 @@ server {
     add_header Referrer-Policy "strict-origin-when-cross-origin" always;
     add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
     # Everything except script/style policies: the app itself sends those as
-    # a per-request nonce CSP (SvelteKit kit.csp — its production bootstrap is
-    # an inline script). Browsers intersect ALL CSP headers, so do NOT add
+    # a per-request nonce CSP (csp in the sveltekit() plugin options in
+    # frontend/vite.config.ts — its production bootstrap is an inline script).
+    # Browsers intersect ALL CSP headers, so do NOT add
     # script-src, style-src or default-src here: a nonce-less script-src
     # would block the app's bootstrap, and only the app knows the nonces.
     add_header Content-Security-Policy "img-src 'self' data: https:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'" always;

@@ -93,7 +93,7 @@ Container smoke test: `nix build .#tests.<system>.container`. Configuration
 
 - **Frontend SSR:** `locals.authorize('User')` or `locals.authorize('Admin')` in `+page.server.ts` / `+layout.server.ts`
 - **Backend:** ASP.NET auth with cookie + OIDC. Claims: `local_userid`, `mercury.role`
-- **Admin check:** `mercury.role == "Admin"` claim (set during provider-specific provisioning: Zitadel from roles claim, Entra from config-driven group mapping, generic never)
+- **Admin check:** `mercury.role == "Admin"` claim (set during provider-specific provisioning: Zitadel from its roles claim, Entra from config-driven group mapping, generic from a `roles` claim containing `role.admin`)
 - **Entra ID provider:** selects `EntraUserProvisioner`. Config field `EntraConfig.AdminGroupIds` (group object ids), matched against the `groups` claim. Profile photo is fetched from Microsoft Graph (`/me/photo/$value`) on login using the OIDC access token — the Entra app registration must pre-authorize the Graph `User.Read` scope so the token is valid for Graph, and `groupMembershipClaims` must be enabled (`SecurityGroup`/`ApplicationGroup`) for the `groups` claim to appear.
 
 ### API Client

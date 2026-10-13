@@ -6,8 +6,9 @@
 #   - the ASP.NET Core backend (port 5023)
 #   - the SvelteKit frontend (adapter-node, port 3000)
 #   - a mock OpenID Connect provider (port 9400)
-#   - an nginx reverse proxy (port 80) that routes /, /api, /signin-oidc and
-#     /signedout exactly like a production deployment
+#   - an nginx reverse proxy (port 80) that routes / (frontend, incl. the
+#     /signedout landing page) and /api/ (backend, incl. the OIDC callback
+#     /api/signin-oidc) exactly like a production deployment
 #
 # The test drives a real headless browser (Playwright + Chromium, both bundled
 # by nixpkgs) from inside the VM. The browser script (integration_test.py)

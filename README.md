@@ -80,6 +80,7 @@ podman run -d --restart=on-failure --name mercury \
   -e 'OidcConfig__AuthorityUrl=https://sso.example.org' \
   -e 'OidcConfig__ClientId=mercury' \
   -e 'OidcConfig__ClientSecret=secret' \
+  -e 'OidcConfig__ProviderType=Zitadel|Entra|Generic' \
   mercury:0.0.1
 ```
 

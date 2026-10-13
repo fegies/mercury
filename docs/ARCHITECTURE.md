@@ -6,8 +6,8 @@ Self-hosted auction platform for organization-internal auctions. Users browse an
 
 | Layer | Technology | Version |
 |---|---|---|
-| Frontend | SvelteKit + Svelte 5 (runes) | 2.20 / 5.25 |
-| UI | Skeleton UI (Rocket theme) + Tailwind CSS 4 | 3.1 / 4.0 |
+| Frontend | SvelteKit + Svelte 5 (runes) | 3.0 / 5.57 |
+| UI | Skeleton UI (Rocket theme) + Tailwind CSS 4 | 3.1 / 4.1 |
 | Backend | ASP.NET Core (C#) | 10.0 |
 | Database | PostgreSQL via raw Npgsql (single event-sourced `app_events` table) | 10.0 |
 | Auth | OIDC (cookie + OpenIdConnect) | — |
@@ -54,7 +54,7 @@ Startup sequence:
 | `OidcController` | `GET /api/login`, `POST /api/logout` (optional `?idp=1` also ends the IdP SSO session) | None (hidden from OpenAPI) | OIDC login/logout flow. The styled `/signedout` landing page is served by the frontend |
 | `UserInfoController` | `GET /api/userinfo/me` | User | Returns current user info + admin flag |
 | `ProfilePictureController` | `GET /api/profilepictures/{id}` | User | Serves locally-stored profile pictures (e.g. Entra photos fetched at login) |
-| `AuctionController` | `GET/POST/PATCH /api/auctions...` | User / Admin | Auction CRUD, image upload/serve/removal |
+| `AuctionController` | `GET/POST/PATCH/DELETE /api/auctions...` | User / Admin | Auction CRUD, images, bids, close/cancel/extend |
 | `LiveController` | `GET /api/events/stream` | User | Server-sent-events stream: targeted notifications (outbid, won, cancelled) + broadcast auction-change pings |
 
 ### Services
@@ -64,7 +64,7 @@ Startup sequence:
 | `UserProvisionService` | Provisions the user via `IncomingEventHandler<ProvisionUserInput, UserProvisionResult>` (find-or-create + profile deltas as events), adds `local_userid` claim |
 | `ZitadelUserProvisioner` | Builds provisioning input from `picture`/roles claims, maps Zitadel roles to `mercury.role=Admin` claim |
 | `EntraUserProvisioner` | Builds provisioning input for Microsoft Entra ID: maps groups to `mercury.role=Admin`, downloads the profile photo from Microsoft Graph at login (via the access token) and stores it locally through `IImageStorage`, setting `ProfilePictureUrl` to the local `/api/profilepictures/{id}` endpoint |
-| `GenericUserProvisioner` | Core-claims-only fallback for non-Zitadel providers |
+| `GenericUserProvisioner` | Core-claims fallback for non-Zitadel providers; grants Admin when the `roles` claim contains `role.admin` |
 | `ImageStorageService` | Reusable local-disk file storage (`data/images/`, namespaced by area + id) used by auction images and profile pictures |
 
 ### Domain Model

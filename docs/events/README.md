@@ -24,11 +24,14 @@ All domain events extend `StoredEvent`:
 
 | Event | Purpose | Key Fields |
 |---|---|---|
-| `AuctionCreated` | A new auction is created by an admin. | `AuctionId`, `Title`, `Description`, `MinimumPrice`, `ClosureTime` |
-| `AuctionUpdated` | An admin modifies auction metadata. | `AuctionId`, optional `Title?`, `Description?`, `MinimumPrice?`, `ClosureTime?` |
+| `AuctionCreated` | A new auction is created by an admin. | `AuctionId`, `Title`, `Description`, `MinimumPrice`, `ClosureTime`, `IsPublished?` |
+| `AuctionUpdated` | An admin modifies auction metadata. | `AuctionId`, optional `Title?`, `Description?`, `MinimumPrice?`, `IsPublished?` |
 | `AuctionImagesAdded` | One or more images are attached to an auction. | `AuctionId`, list of `{ Id, FilePath, Hash }` |
 | `AuctionImagesRemoved` | One or more images are detached from an auction. | `AuctionId`, list of image Guids |
-| `AuctionClosed` | An auction is closed (manually or by expiry). | `AuctionId`, `Reason` (Manual \| Expired) |
+| `AuctionCloseExtended` | An admin moves the closure time later. | `AuctionId`, `NewClosureTime` |
+| `AuctionClosed` | An auction is closed (manually or by expiry). | `AuctionId`, `Reason` (Manual \| Expired), `WinnerUserId?`, `WinningPrice?` |
+| `AuctionCancelled` | An admin cancels the auction — closed with no winner. | `AuctionId` |
+| `BidPlaced` | A bidder places or raises a maximum bid (see [Bidding rules](../bids.md)). | `AuctionId`, `BidderId`, `MaximumAmount`, `Timestamp` |
 
 ### User Provisioning Events
 
@@ -42,9 +45,12 @@ All domain events extend `StoredEvent`:
 
 Find-or-create is keyed on the `(oidIss, oidSub)` dimensions of `UserCreated`: concurrent first logins serialize on their advisory locks, the loser receives `ConcurrencyConflictException` and its retry adopts the winner's user id. Provisioning resolves identity→userId with a small lookup read up front, then scopes the consistency boundary to `ForUser(userId)`.
 
-### Future Event Types
+### Bid Events
 
-- **Bid events** — Placed, withdrawn, outbid notifications.
+Bid placement is event-sourced and follows the eBay-style proxy-bidding rules
+described in [Bidding rules](../bids.md); `BidPlaced` appears in the catalog
+above. Outbid/won/cancelled notifications are live fan-out over SSE, not
+persisted events. Withdrawn bids remain future work.
 
 ## Concurrency Model
 

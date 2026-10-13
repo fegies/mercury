@@ -17,6 +17,7 @@ This document covers the full lifecycle of an auction in Project Mercury: creati
 | `Description` | `string` | Longer description of the item or auction terms. |
 | `MinimumPrice` | `decimal` | Lowest acceptable bid. |
 | `ClosureTime` | `DateTime` | UTC timestamp after which no new bids are accepted. |
+| `IsPublished` | `bool?` | Whether the auction is visible to non-admin users. Unpublished auctions are hidden from them (404). |
 
 ### Invariants
 
@@ -50,12 +51,13 @@ As an admin, I want to create a new auction with a title, description, minimum p
 | `Title` | `string?` | New title, or null if unchanged. |
 | `Description` | `string?` | New description, or null if unchanged. |
 | `MinimumPrice` | `decimal?` | New minimum price, or null if unchanged. |
+| `IsPublished` | `bool?` | Publish/unpublish toggle, or null if unchanged. |
 
 All optional fields are nullable. Only the fields present (non-null) in the event represent changes. This keeps events minimal and allows consumers to distinguish intentional changes from unchanged values. Closure time changes use the dedicated `AuctionCloseExtended` event described below.
 
 ### Invariants
 
-- The target auction must not already be closed.
+- The target auction must not already be closed — with one exception: the publish/unpublish toggle (`IsPublished`) is still accepted on a closed auction; content edits are rejected.
 - If `Title` is provided, it must be non-empty.
 - If `MinimumPrice` is provided, it must be greater than or equal to 0.
 - Only users with the Admin role may update auctions.
@@ -226,10 +228,10 @@ State = fold over [AuctionCreated, AuctionUpdated..., AuctionCloseExtended..., A
 - After each `AuctionCloseExtended`: the closure time is replaced with the (later) new closure time.
 - After `AuctionImagesAdded`: new images are appended to the image list.
 - After `AuctionImagesRemoved`: referenced images are removed from the image list.
-- After `AuctionClosed`: the auction is marked as closed and immutably frozen — no further updates, image changes, or bids are allowed.
+- After `AuctionClosed`: the auction is marked as closed and immutably frozen — no further content updates, image changes, or bids are allowed (only the published flag can still change).
 - After `AuctionCancelled`: the auction is marked as closed **and** cancelled and immutably frozen — no further updates, image changes, bids, or closure are allowed.
 
-An auction that has received an `AuctionClosed` or `AuctionCancelled` event is considered terminal. All mutation operations must check for this state and reject changes with an appropriate error.
+An auction that has received an `AuctionClosed` or `AuctionCancelled` event is considered terminal. All mutation operations must check for this state and reject changes with an appropriate error — except the publish/unpublish toggle.
 
 ---
 

@@ -143,4 +143,3 @@ Container smoke test: `nix build .#tests.<system>.container`. Configuration
 
 - The frontend is stateless: no database access and no server-side session state — pages/actions only proxy the backend API for SSR
 - **OpenAPI spec generation:** `dotnet build` generates `webshell/openapi/webshell_backend.json` but may skip regeneration on incremental builds. Run `dotnet clean && dotnet build` to force it. Fallback: start the server and curl `/openapi/backend.json`.
-- **Dependency bridge:** `frontend/package.json` overrides force `postcss-selector-parser ^7.1.6` under `@tailwindcss/typography` because typography (latest 0.5.20) still pins vulnerable 6.0.10 and upstream has no fixed release yet. Bump `@tailwindcss/typography` once upstream ships a fix and **delete the override**.

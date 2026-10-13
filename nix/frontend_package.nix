@@ -1,5 +1,4 @@
 {
-  lib,
   sources,
   buildNpmPackage,
 }:
@@ -9,7 +8,7 @@ buildNpmPackage {
 
   src = sources;
 
-  npmDepsHash = "sha256-+fy2DI4mJet9Pp5Fl3mFw5Ed7yLkc1DUOoHrA1XhjGs=";
+  npmDepsHash = "sha256-zsVO9jeEQ7w7OcEXX0INoUX6Ig0FvhZrBmtHBzjY7oU=";
 
   npmPackFlags = ["--ignore-scripts"];
 

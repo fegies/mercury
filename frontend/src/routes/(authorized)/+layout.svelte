@@ -67,7 +67,7 @@
 						Logout
 					</button>
 				</form>
-				<form method="post" action="/api/logout?idp=1">
+				<form method="post" action="/api/logout?idp=true">
 					<button type="submit" class="block w-full cursor-pointer text-left hover:underline">
 						Sign out of SSO
 					</button>

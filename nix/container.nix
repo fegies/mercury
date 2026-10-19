@@ -87,6 +87,10 @@
       server {
         listen 0.0.0.0:8080;
 
+        proxy_buffer_size 128k;
+        proxy_buffers 8 128k;
+        proxy_busy_buffers_size 256k;
+
         proxy_http_version 1.1;
         proxy_set_header Host $host;
         # X-Forwarded-For is passed through untouched: the TLS terminator

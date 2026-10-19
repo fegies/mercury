@@ -43,6 +43,7 @@
   writeShellApplication,
   busybox,
   frontend,
+  cacert,
 }: let
   version = "0.0.1";
   stateDir = "/var/lib/mercury";
@@ -201,6 +202,7 @@ in
       entrypoint
       busybox
       mercury-etc
+      cacert
     ];
 
     extraCommands = ''

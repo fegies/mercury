@@ -109,10 +109,10 @@ builder.Services.AddAuthentication(options =>
     options.Scope.Add("profile");
     options.Scope.Add("email");
 
-    // OIDC tokens are only consumed by the Entra provisioner (Microsoft Graph
-    // profile photo fetch); avoid persisting them in the auth cookie otherwise.
-    options.SaveTokens =
-        oidcConf.ProviderType == OidcConfigurationValue.ProviderTypeValue.Entra;
+    // OIDC tokens are never persisted in the auth cookie (Entra access/id
+    // tokens overflow it). The Entra provisioner still receives the access
+    // token transiently from ProtocolMessage in OnTokenValidated.
+    options.SaveTokens = false;
     options.GetClaimsFromUserInfoEndpoint = true;
     options.TokenValidationParameters.NameClaimType = JwtRegisteredClaimNames.Name;
     options.TokenValidationParameters.RoleClaimType = "role";

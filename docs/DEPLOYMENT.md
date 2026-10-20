@@ -170,7 +170,7 @@ Notes:
 | `OidcConfig__ClientId`       | Client id of this app registration         | —        |
 | `OidcConfig__ClientSecret`   | Client secret                              | —        |
 | `OidcConfig__ProviderType`   | `Zitadel`, `Entra` or `Generic`            | — (required choice, no default) |
-| `EntraConfig__AdminGroupIds` | JSON array of Entra group ids granting admin (Entra only) | `[]` |
+| `EntraConfig__AdminAppRoles` | JSON array of Entra app role values granting admin (Entra only) | `[]` |
 
 The redirect URI registered with the provider must be
 `https://<public-host>/api/signin-oidc` — the backend's OIDC callback path,

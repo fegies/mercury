@@ -14,8 +14,8 @@ class EntraUserProvisioner(EntraConfigurationValue entraConfig, IImageStorage im
     {
         var core = ProvisionUserClaims.ReadCore(principal);
 
-        var groups = principal.FindAll("groups").Select(c => c.Value).ToList();
-        var is_admin = groups.Any(g => entraConfig.AdminGroupIds.Contains(g));
+        var roles = ReadRoleClaims(principal);
+        var is_admin = roles.Any(r => entraConfig.AdminAppRoles.Contains(r));
 
         string? pictureUrl = null;
         if (accessToken != null)
@@ -42,6 +42,20 @@ class EntraUserProvisioner(EntraConfigurationValue entraConfig, IImageStorage im
         => pendingPictureId is { } id ? imageStorage.DeleteAsync(ProfilePictureArea, id, ct) : Task.CompletedTask;
 
     private Guid? pendingPictureId;
+
+    // Entra emits app role assignments in the 'roles' claim. The JWT handler
+    // normally preserves array claims as multiple same-type claims, but the
+    // OIDC handler can flatten them into a space-delimited string, so accept
+    // both forms.
+    private static IEnumerable<string> ReadRoleClaims(ClaimsPrincipal principal)
+    {
+        var claim = principal.FindFirst("roles");
+        if (claim is null)
+            return [];
+        if (claim.Value.Contains(' '))
+            return claim.Value.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        return principal.FindAll("roles").Select(c => c.Value);
+    }
 
     private async Task<Guid?> StoreProfilePictureAsync(string accessToken, CancellationToken ct)
     {

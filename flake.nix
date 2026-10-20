@@ -2,6 +2,10 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-26.05";
     systems.url = "github:nix-systems/default";
+    rust-overlay = {
+      url = "github:oxalica/rust-overlay";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
     devenv = {
       url = "github:cachix/devenv";
       inputs = {
@@ -19,6 +23,7 @@
     self,
     nixpkgs,
     devenv,
+    rust-overlay,
     systems,
     ...
   } @ inputs: let
@@ -40,6 +45,12 @@
                 postgresql
                 jq
               ];
+
+              languages.rust = {
+                enable = true;
+                channel = "stable";
+                components = ["rustc" "cargo" "clippy" "rustfmt" "rust-analyzer" "rust-src"];
+              };
 
               languages = {
                 dotnet = {

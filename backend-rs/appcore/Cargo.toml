@@ -1,0 +1,15 @@
+[package]
+name = "appcore"
+version.workspace = true
+edition.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+wellspring = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+time = { workspace = true }
+uuid = { workspace = true }
+rust_decimal = { workspace = true }

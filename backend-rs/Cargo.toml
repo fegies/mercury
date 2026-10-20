@@ -1,0 +1,30 @@
+[workspace]
+resolver = "3"
+members = [
+	"wellspring",
+	"appcore",
+	"wellspring-store-postgres",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+
+[workspace.dependencies]
+wellspring = { path = "wellspring" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+time = "0.3"
+futures-timer = "3"
+uuid = "1"
+rust_decimal = "1"
+tokio = "1"
+tokio-postgres = { version = "0.7", features = ["with-time-0_3", "with-serde_json-1"] }
+deadpool-postgres = "0.14"
+
+[profile.dev]
+debug = 1

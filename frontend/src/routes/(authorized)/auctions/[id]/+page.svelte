@@ -69,66 +69,71 @@
 
 <div class="flex flex-col gap-10">
 	<h1 class="h1">{auction.title}</h1>
-	<Imageset links={auction.imageUrls}></Imageset>
-	<div>
-		{auction.description}
-	</div>
+	<div class="flex flex-col gap-10 lg:flex-row lg:items-start">
+		<div class="flex flex-col gap-10 lg:min-w-0 lg:flex-1">
+			<Imageset links={auction.imageUrls}></Imageset>
+			<div>
+				{auction.description}
+			</div>
+			{#if auction.isClosed}
+				<span class="preset-filled-error-500 badge w-fit">Closed</span>
+			{/if}
+		</div>
 
-	{#if auction.isClosed}
-		<span class="preset-filled-error-500 badge w-fit">Closed</span>
-	{:else}
-		<section class="card flex flex-col gap-4 p-6">
-			<h2 class="h3">Place a bid</h2>
+		{#if !auction.isClosed}
+			<section class="card flex flex-col gap-4 p-6 lg:w-1/3 lg:shrink-0">
+				<h2 class="h3">Place a bid</h2>
 
-			<p>
-				Current price: <strong>€{currentBid.toFixed(2)}</strong>
-				{#if i_am_highest_bidder}
-					<span
-						class="inline-flex items-center rounded-md bg-green-400/10 px-2 py-1 align-middle text-xs font-medium text-green-400 inset-ring inset-ring-green-500/20"
-						>You are the highest bidder</span
-					>
-				{:else if i_placed_a_bet}
-					<span
-						class="inline-flex items-center rounded-md bg-red-400/10 px-2 py-1 text-xs font-medium text-red-400 inset-ring inset-ring-red-400/20"
-						>You have been outbid</span
-					>
-				{/if}
-			</p>
-
-			{#if myHighest != null}
 				<p>
-					Your maximum bid: <strong>€{myHighest.toFixed(2)}</strong>
+					Current price: <strong>€{currentBid.toFixed(2)}</strong>
+					{#if i_am_highest_bidder}
+						<span
+							class="inline-flex items-center rounded-md bg-green-400/10 px-2 py-1 align-middle text-xs font-medium text-green-400 inset-ring inset-ring-green-500/20"
+							>You are the highest bidder</span
+						>
+					{:else if i_placed_a_bet}
+						<span
+							class="inline-flex items-center rounded-md bg-red-400/10 px-2 py-1 text-xs font-medium text-red-400 inset-ring inset-ring-red-400/20"
+							>You have been outbid</span
+						>
+					{/if}
 				</p>
-			{/if}
 
-			{#if form?.bid}
-				<div class="card preset-filled-success-500 p-4">Bid placed.</div>
-			{/if}
+				{#if myHighest != null}
+					<p>
+						Your maximum bid: <strong>€{myHighest.toFixed(2)}</strong>
+					</p>
+				{/if}
 
-			{#if form?.errors && form.errors.length > 0}
-				<div class="card preset-tonal-surface flex flex-col gap-2 p-4">
-					<span>There were errors: </span>
-					{#each form.errors as error (error)}
-						<span class="card preset-tonal-error p-4">{error}</span>
-					{/each}
-				</div>
-			{/if}
+				{#if form?.bid}
+					<div class="card preset-filled-success-500 p-4">Bid placed.</div>
+				{/if}
 
-			<form method="POST" action="?/bid" class="flex flex-col gap-4">
-				<label class="label">
-					<span class="label-text">Raise your maximum bid</span>
-					<input
-						type="number"
-						name="maximum_amount"
-						step="0.5"
-						min={currentBid + 0.5}
-						required
-						class="input"
-						value={min_increase}
-					/>
-				</label>
-				<input type="submit" class="btn preset-filled-primary-500 w-fit" value="Place bid" />
-			</form>
-		</section>
-	{/if}
+				{#if form?.errors && form.errors.length > 0}
+					<div class="card preset-tonal-surface flex flex-col gap-2 p-4">
+						<span>There were errors: </span>
+						{#each form.errors as error (error)}
+							<span class="card preset-tonal-error p-4">{error}</span>
+						{/each}
+					</div>
+				{/if}
+
+				<form method="POST" action="?/bid" class="flex flex-col gap-4">
+					<label class="label">
+						<span class="label-text">Raise your maximum bid</span>
+						<input
+							type="number"
+							name="maximum_amount"
+							step="0.5"
+							min={currentBid + 0.5}
+							required
+							class="input"
+							value={min_increase}
+						/>
+					</label>
+					<input type="submit" class="btn preset-filled-primary-500 w-fit" value="Place bid" />
+				</form>
+			</section>
+		{/if}
+	</div>
 </div>

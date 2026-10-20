@@ -12,7 +12,7 @@ Self-hosted auction platform for organization-internal auctions. SvelteKit front
 - **No warnings before you are done.** `dotnet build` and `dotnet test` must produce zero warnings. Frontend `npm run check` must produce zero new errors. Fix or suppress all warnings before considering work complete.
 - **Frontend tests must be clean for all PRs.** Run `npm run test` (Vitest) in `frontend/` — all tests must pass. New UI/server-side logic should come with tests where practical (pure helpers in `src/lib/*.test.ts`, SvelteKit form-action/loader tests in `tests/`, never inside `src/routes/` since SvelteKit reserves `+`-prefixed files there).
 - **Controllers stay slim.** Never construct handlers, event stores, or services manually inside controllers — register them with DI and inject them via the constructor (prefer the two-parameter `AddScoped<Interface, ImplementingType>()` variant). A controller should only parse the request, call injected collaborators, and map results/errors.
-- **Configuration is structured and typed.** Never read arbitrary string keys from `IConfiguration` at runtime. All configuration must be bound to a typed config object at startup (via `builder.Configuration.Bind(config)` on `BackendConfig`) and injected through DI. `BackendConfig` aggregates typed sections (`OidcConfig`, `EntraConfig`, `AuctionConfig`); each section is its own `*ConfigurationValue` class. Provider-specific settings must live in a dedicated config class, not be scraped ad-hoc from config.
+- **Configuration is structured and typed.** Never read arbitrary string keys from `IConfiguration` at runtime. All configuration must be bound to a typed config object at startup (via `builder.Configuration.Bind(config)` on `BackendConfig`) and injected through DI. `BackendConfig` aggregates typed sections (`OidcConfig`, `AuctionConfig`); each section is its own `*ConfigurationValue` class. Provider-specific settings must live in a dedicated config class, not be scraped ad-hoc from config.
 
 ## Commands
 
@@ -93,8 +93,8 @@ Container smoke test: `nix build .#tests.<system>.container`. Configuration
 
 - **Frontend SSR:** `locals.authorize('User')` or `locals.authorize('Admin')` in `+page.server.ts` / `+layout.server.ts`
 - **Backend:** ASP.NET auth with cookie + OIDC. Claims: `local_userid`, `mercury.role`
-- **Admin check:** `mercury.role == "Admin"` claim (set during provider-specific provisioning: Zitadel from its roles claim, Entra from config-driven app role mapping, generic from a `roles` claim containing `role.admin`)
-- **Entra ID provider:** selects `EntraUserProvisioner`. Config field `EntraConfig.AdminAppRoles` (app role values defined on the app registration), matched against the `roles` claim Entra emits from app role assignments. Profile photo is fetched from Microsoft Graph (`/me/photo/$value`) on login using the OIDC access token — the Entra app registration must pre-authorize the Graph `User.Read` scope so the token is valid for Graph.
+- **Admin check:** `mercury.role == "Admin"` claim (set during provider-specific provisioning: Zitadel from its roles claim, Entra/generic from a `roles` claim containing `role.admin`)
+- **Entra ID provider:** selects `EntraUserProvisioner`, which delegates role mapping to `GenericUserProvisioner` (Admin when the `roles` claim contains the `role.admin` app role value — the app registration defines that app role and it is assigned to admins under the Enterprise Application). Profile photo is fetched from Microsoft Graph (`/me/photo/$value`) on login using the OIDC access token — the Entra app registration must pre-authorize the Graph `User.Read` scope so the token is valid for Graph.
 
 ### API Client
 

@@ -15,11 +15,6 @@ public class BackendConfig
     public OidcConfigurationValue OidcConfig { get; init; } = new();
 
     /// <summary>
-    /// Microsoft Entra ID provider options
-    /// </summary>
-    public EntraConfigurationValue EntraConfig { get; init; } = new();
-
-    /// <summary>
     /// Auction domain options
     /// </summary>
     public AuctionConfig AuctionConfig { get; init; } = new();

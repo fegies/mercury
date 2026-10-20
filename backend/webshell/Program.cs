@@ -59,10 +59,8 @@ switch (config.OidcConfig.ProviderType)
         break;
     case OidcConfigurationValue.ProviderTypeValue.Entra:
         builder.Services.AddHttpClient();
-        builder.Services.AddScoped<IUserProvisioner>(sp => new EntraUserProvisioner(
-            config.EntraConfig,
-            sp.GetRequiredService<IImageStorage>(),
-            sp.GetRequiredService<IHttpClientFactory>()));
+        builder.Services.AddScoped<GenericUserProvisioner>();
+        builder.Services.AddScoped<IUserProvisioner, EntraUserProvisioner>();
         break;
     default:
         builder.Services.AddScoped<IUserProvisioner, GenericUserProvisioner>();

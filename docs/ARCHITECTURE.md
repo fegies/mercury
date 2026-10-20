@@ -63,7 +63,7 @@ Startup sequence:
 |---|---|
 | `UserProvisionService` | Provisions the user via `IncomingEventHandler<ProvisionUserInput, UserProvisionResult>` (find-or-create + profile deltas as events), adds `local_userid` claim |
 | `ZitadelUserProvisioner` | Builds provisioning input from `picture`/roles claims, maps Zitadel roles to `mercury.role=Admin` claim |
-| `EntraUserProvisioner` | Builds provisioning input for Microsoft Entra ID: maps app role assignments (`roles` claim) to `mercury.role=Admin`, downloads the profile photo from Microsoft Graph at login (via the access token) and stores it locally through `IImageStorage`, setting `ProfilePictureUrl` to the local `/api/profilepictures/{id}` endpoint |
+| `EntraUserProvisioner` | Builds provisioning input for Microsoft Entra ID: delegates role mapping to `GenericUserProvisioner` (Admin on a `role.admin` app role), then downloads the profile photo from Microsoft Graph at login (via the access token) and stores it locally through `IImageStorage`, setting `ProfilePictureUrl` to the local `/api/profilepictures/{id}` endpoint |
 | `GenericUserProvisioner` | Core-claims fallback for non-Zitadel providers; grants Admin when the `roles` claim contains `role.admin` |
 | `ImageStorageService` | Reusable local-disk file storage (`data/images/`, namespaced by area + id) used by auction images and profile pictures |
 
@@ -94,8 +94,9 @@ BackendConfig
 │   ├── ClientId (required)
 │   ├── ClientSecret (required)
 │   └── ProviderType: Zitadel | Entra | Generic
-└── EntraConfig: EntraConfigurationValue
-    └── AdminAppRoles: string[] (Entra app role values granting Admin)
+├── AuctionConfig
+├── ImageStorage
+└── ForwardedConfig
 ```
 
 ### Authorization

@@ -170,7 +170,12 @@ Notes:
 | `OidcConfig__ClientId`       | Client id of this app registration         | —        |
 | `OidcConfig__ClientSecret`   | Client secret                              | —        |
 | `OidcConfig__ProviderType`   | `Zitadel`, `Entra` or `Generic`            | — (required choice, no default) |
-| `EntraConfig__AdminGroupIds` | JSON array of Entra group ids granting admin (Entra only) | `[]` |
+
+For the `Entra` provider, admins are granted the Admin role through an app
+role on the app registration: define an app role with the value `role.admin`
+(App registrations → App roles) and assign it to the users or groups that
+administer the platform (Enterprise application → Users and groups). The
+role arrives at login in the `roles` claim.
 
 The redirect URI registered with the provider must be
 `https://<public-host>/api/signin-oidc` — the backend's OIDC callback path,

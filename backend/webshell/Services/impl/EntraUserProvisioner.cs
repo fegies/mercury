@@ -1,21 +1,19 @@
 using System.Net.Http.Headers;
 using System.Security.Claims;
 using appcore.Infra.Evaluators;
-using backend.Configuration;
 
 namespace backend.Services;
 
-class EntraUserProvisioner(EntraConfigurationValue entraConfig, IImageStorage imageStorage, IHttpClientFactory httpClientFactory) : IUserProvisioner
+class EntraUserProvisioner(GenericUserProvisioner generic, IImageStorage imageStorage, IHttpClientFactory httpClientFactory) : IUserProvisioner
 {
     private const string GraphPhotoUrl = "https://graph.microsoft.com/v1.0/me/photo/$value";
     private const string ProfilePictureArea = "users";
 
     public async Task<ProvisionUserInput> BuildInputAsync(ClaimsPrincipal principal, string? accessToken, CancellationToken ct)
     {
-        var core = ProvisionUserClaims.ReadCore(principal);
-
-        var groups = principal.FindAll("groups").Select(c => c.Value).ToList();
-        var is_admin = groups.Any(g => entraConfig.AdminGroupIds.Contains(g));
+        // Role mapping matches the generic provider: Admin is granted when the
+        // 'roles' claim contains the 'role.admin' app role value.
+        var input = await generic.BuildInputAsync(principal, accessToken, ct);
 
         string? pictureUrl = null;
         if (accessToken != null)
@@ -25,18 +23,11 @@ class EntraUserProvisioner(EntraConfigurationValue entraConfig, IImageStorage im
                 pictureUrl = $"/api/profilepictures/{storedId}";
         }
 
-        return core with
-        {
-            ProfilePictureUrl = pictureUrl,
-            Role = is_admin ? "Admin" : null,
-        };
+        return input with { ProfilePictureUrl = pictureUrl };
     }
 
     public void ApplyClaims(ClaimsPrincipal principal, ProvisionUserInput input)
-    {
-        if (input.Role != null)
-            principal.Identities.First().AddClaim(new Claim("mercury.role", input.Role));
-    }
+        => generic.ApplyClaims(principal, input);
 
     public Task RollbackPendingWritesAsync(CancellationToken ct)
         => pendingPictureId is { } id ? imageStorage.DeleteAsync(ProfilePictureArea, id, ct) : Task.CompletedTask;

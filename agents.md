@@ -8,7 +8,7 @@ Self-hosted auction platform for organization-internal auctions. SvelteKit front
 
 ## Important Rules
 
-- **Branch, commit, PR.** Create a feature branch, commit changes, push to `origin` (the hive fork), and open a PR against upstream `fegies/projectMercury` (`main` base). Always sync from upstream first: `git fetch upstream && git merge upstream/main`.
+- **Branch, commit, PR.** Create a feature branch, commit changes, push the branch directly to upstream `fegies/projectMercury`, and open a PR there (`main` base). Always sync from upstream first: `git fetch upstream && git merge upstream/main`.
 - **No warnings before you are done.** `dotnet build` and `dotnet test` must produce zero warnings. Frontend `npm run check` must produce zero new errors. Fix or suppress all warnings before considering work complete.
 - **Frontend tests must be clean for all PRs.** Run `npm run test` (Vitest) in `frontend/` — all tests must pass. New UI/server-side logic should come with tests where practical (pure helpers in `src/lib/*.test.ts`, SvelteKit form-action/loader tests in `tests/`, never inside `src/routes/` since SvelteKit reserves `+`-prefixed files there).
 - **Controllers stay slim.** Never construct handlers, event stores, or services manually inside controllers — register them with DI and inject them via the constructor (prefer the two-parameter `AddScoped<Interface, ImplementingType>()` variant). A controller should only parse the request, call injected collaborators, and map results/errors.

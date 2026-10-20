@@ -53,7 +53,7 @@
 				<strong class="text-xl uppercase">{data.branding}</strong>
 			</a>
 			<a href={resolve('auctions')} class="card p-3 sm:p-5">Auctions</a>
-			{#if data.me}
+			{#if data.me?.canStartAuctions}
 				<a href={resolve('manage-auctions')} class="card p-3 sm:p-5">Manage Auctions</a>
 			{/if}
 		</div>

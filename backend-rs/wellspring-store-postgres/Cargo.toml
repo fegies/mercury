@@ -9,4 +9,9 @@ workspace = true
 [dependencies]
 wellspring = { workspace = true }
 tokio-postgres = { workspace = true }
-deadpool-postgres = { workspace = true }
+erased-serde = { workspace = true }
+serde = { workspace = true}
+futures-util =  {workspace = true }
+time.workspace = true
+serde_json.workspace = true
+xxhash-rust = { version = "0.8.19", features = ["xxh3"] }
